@@ -44,6 +44,10 @@ def sample_mask(idx, l):
 
 def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
     """Load data."""
+
+    if dataset_str == "reddit":
+        return load_data_sage("C:/reddit_new/reddit")
+
     names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
     objects = []
     for i in range(len(names)):
@@ -94,6 +98,9 @@ def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
     print(features.shape)
 
     return adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask
+
+def load_data_sage(prefix):
+    return None
 
 def load_random_data(size):
 

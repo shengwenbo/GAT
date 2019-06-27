@@ -156,8 +156,11 @@ with tf.Graph().as_default():
         ts_loss = 0.0
         ts_acc = 0.0
 
+        test_logs = []
+        test_lbls = []
+
         while ts_step * batch_size < ts_size:
-            loss_value_ts, acc_ts = sess.run([loss, accuracy],
+            loss_value_ts, acc_ts, log = sess.run([loss, accuracy, log_resh],
                 feed_dict={
                     ftr_in: features[ts_step*batch_size:(ts_step+1)*batch_size],
                     bias_in: biases[ts_step*batch_size:(ts_step+1)*batch_size],
@@ -168,6 +171,30 @@ with tf.Graph().as_default():
             ts_loss += loss_value_ts
             ts_acc += acc_ts
             ts_step += 1
+            test_logs.append(log)
+            test_lbls.append(y_test[0])
+
+
+        y = y_train + y_val + y_test
+        lbl_all = np.argmax(y[0], axis=-1).tolist()
+        for logs in test_logs:
+            pred = np.argmax(logs, axis=-1).tolist()
+
+            for p, r, i in zip(pred, lbl_all, range(len(pred))):
+                if p != r:
+                    print("ID: {}".format(i))
+                    print("Pred: {}, real: {}.".format(p, r))
+
+                    ftr = features[0, i, :]
+                    bias = biases[0, i, :]
+                    nbs = [j for j in range(len(pred)) if bias[j] > -1]
+                    ftr_nb = features[0, nbs, :]
+
+                    print("Neighbors: {}".format(nbs))
+                    # print("Feature: {}".format(ftr))
+                    print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
+                    # print("Neighbor Features: {}".format(ftr_nb))
+                    print()
 
         print('Test loss:', ts_loss/ts_step, '; Test accuracy:', ts_acc/ts_step)
 
