@@ -11,8 +11,9 @@ TRAIN_SIZE = 120
 TEST_SIZE = 1000
 
 def load_citeseer():
-    allx, ally, x, y, tx, ty, test_index, id2idx = load_content()
     graph = load_graph()
+    linked_nodes = find_linked(graph)
+    allx, ally, x, y, tx, ty, test_index, id2idx = load_content(linked_nodes)
 
     idx_graph = {}
     for source, target in graph:
@@ -38,7 +39,7 @@ def load_citeseer():
         [f.write(str(i)+"\n") for i in test_index]
 
 
-def load_content():
+def load_content(linked_nodes):
     with open(os.path.join(PATH, "citeseer.content"), "r", encoding="utf-8") as fin:
         id2idx = {}
         i = 0
@@ -54,9 +55,18 @@ def load_content():
             lbls.append(lbl2array(lbl))
             i += 1
 
-        total = i
+        isolated_nodes = linked_nodes - set(ids)
+        for node in isolated_nodes:
+            ftrs.append(["0"]*len(ftrs[0]))
+            lbls.append(lbl2array("None"))
+            ids.append(node)
+            id2idx[node] = i
+            i += 1
 
-        train_ids = random.sample(ids, k=TRAIN_SIZE)
+        total = i
+        print("nodes count:", total)
+
+        train_ids = random.sample(set(ids), k=TRAIN_SIZE)
         test_ids = random.sample(list(set(ids) - set(train_ids)), k=TEST_SIZE)
         other_ids = list(set(ids) - set(train_ids) - set(test_ids))
 
@@ -86,7 +96,18 @@ def load_graph():
             graph.append((source, target))
         return graph
 
+def find_linked(graph):
+    linked_nodes = set([])
+    for s, t in graph:
+        linked_nodes.add(s)
+        linked_nodes.add(t)
+    return linked_nodes
+
 def lbl2array(lbl):
+
+    if lbl == "None":
+        return np.zeros(len(LBLS))
+
     idx = LBLS.index(lbl)
     a = np.zeros(len(LBLS))
     a[idx] = 1.0
