@@ -3,16 +3,19 @@ import tensorflow as tf
 
 conv1d = tf.layers.conv1d
 
-def attn_head(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0, residual=False):
+def attn_head(seq, out_sz, adj, bias_mat, activation, in_drop=0.0, coef_drop=0.0, residual=False):
     with tf.name_scope('my_attn'):
         if in_drop != 0.0:
             seq = tf.nn.dropout(seq, 1.0 - in_drop)
 
         seq_fts = tf.layers.conv1d(seq, out_sz, 1, use_bias=False)
 
+        nei_fts = tf.matmul(adj, seq_fts)
+
+
         # simplest self-attention possible
         f_1 = tf.layers.conv1d(seq_fts, 1, 1)
-        f_2 = tf.layers.conv1d(seq_fts, 1, 1)
+        f_2 = tf.layers.conv1d(nei_fts, 1, 1)
         logits = f_1 + tf.transpose(f_2, [0, 2, 1])
         coefs = tf.nn.softmax(tf.nn.leaky_relu(logits) + bias_mat)
 

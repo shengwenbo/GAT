@@ -13,7 +13,7 @@ import sys
 """
 def adj_to_bias(adj, sizes, nhood=1):
     nb_graphs = adj.shape[0]
-    mt = np.empty(adj.shape)
+    mt = np.empty(adj.shape, dtype=np.float32)
     for g in range(nb_graphs):
         mt[g] = np.eye(adj.shape[1])
         for _ in range(nhood):
@@ -22,7 +22,7 @@ def adj_to_bias(adj, sizes, nhood=1):
             for j in range(sizes[g]):
                 if mt[g][i][j] > 0.0:
                     mt[g][i][j] = 1.0
-    return -1e9 * (1.0 - mt)
+    return -1e9 * (1.0 - mt), mt
 
 
 ###############################################
@@ -42,8 +42,8 @@ def sample_mask(idx, l):
     mask[idx] = 1
     return np.array(mask, dtype=np.bool)
 
-def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
-    """Load data."""
+def load_data(dataset_path, dataset_str): # {'pubmed', 'citeseer', 'cora'}
+    """Load cora_data."""
 
     if dataset_str == "reddit":
         return load_data_sage("C:/reddit_new/reddit")
@@ -51,14 +51,14 @@ def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
     names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
     objects = []
     for i in range(len(names)):
-        with open("data/ind.{}.{}".format(dataset_str, names[i]), 'rb') as f:
+        with open("{}/ind.{}.{}".format(dataset_path, dataset_str, names[i]), 'rb') as f:
             if sys.version_info > (3, 0):
                 objects.append(pkl.load(f, encoding='latin1'))
             else:
                 objects.append(pkl.load(f))
 
     x, y, tx, ty, allx, ally, graph = tuple(objects)
-    test_idx_reorder = parse_index_file("data/ind.{}.test.index".format(dataset_str))
+    test_idx_reorder = parse_index_file("{}/ind.{}.test.index".format(dataset_path, dataset_str))
     test_idx_range = np.sort(test_idx_reorder)
 
     if dataset_str == 'citeseer':
@@ -149,7 +149,7 @@ def sparse_to_tuple(sparse_mx):
 
 def standardize_data(f, train_mask):
     """Standardize feature matrix and convert to tuple representation"""
-    # standardize data
+    # standardize cora_data
     f = f.todense()
     mu = f[train_mask == True, :].mean(axis=0)
     sigma = f[train_mask == True, :].std(axis=0)
@@ -191,5 +191,5 @@ def preprocess_adj_bias(adj):
         adj = adj.tocoo()
     adj = adj.astype(np.float32)
     indices = np.vstack((adj.col, adj.row)).transpose()  # This is where I made a mistake, I used (adj.row, adj.col) instead
-    # return tf.SparseTensor(indices=indices, values=adj.data, dense_shape=adj.shape)
+    # return tf.SparseTensor(indices=indices, values=adj.cora_data, dense_shape=adj.shape)
     return indices, adj.data, adj.shape

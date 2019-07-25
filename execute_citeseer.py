@@ -2,12 +2,12 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from models import GAT
+from models import GAT1
 from utils import process
 
-checkpt_file = 'pre_trained/cora/mod_cora.ckpt'
+checkpt_file = 'pre_trained/citeseer/mod_citeseer.ckpt'
 
-dataset = 'cora'
+dataset = 'citeseer'
 
 # training params
 batch_size = 1
@@ -19,7 +19,7 @@ hid_units = [8] # numbers of hidden units per each attention head in each layer
 n_heads = [8, 1] # additional entry for the output layer
 residual = False
 nonlinearity = tf.nn.elu
-model = GAT
+model = GAT1
 
 print('Dataset: ' + dataset)
 print('----- Opt. hyperparams -----')
@@ -33,7 +33,7 @@ print('residual: ' + str(residual))
 print('nonlinearity: ' + str(nonlinearity))
 print('model: ' + str(model))
 
-adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data("cora_data", dataset)
+adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data("citeseer_data", dataset)
 features, spars = process.preprocess_features(features)
 
 nb_nodes = features.shape[0]
