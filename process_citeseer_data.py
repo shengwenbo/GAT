@@ -63,17 +63,17 @@ def load_content():
         ids = train_ids + other_ids + test_ids
         idxs = [id2idx[id] for id in ids]
 
-        ftrs = [ftrs[idx] for idx in idxs]
-        lbls = [lbls[idx] for idx in idxs]
+        ftrs1 = [ftrs[idx] for idx in idxs]
+        lbls1 = [lbls[idx] for idx in idxs]
         for (id, i) in zip(ids, list(range(len(ids)))):
             id2idx[id] = i
 
-        allx = list2csr(ftrs[0 : total - TEST_SIZE])
-        ally = np.array(lbls[0 : total - TEST_SIZE])
-        x = list2csr(ftrs[0 : TRAIN_SIZE])
-        y = np.array(lbls[0 : TRAIN_SIZE])
-        tx = list2csr(ftrs[total - TEST_SIZE : ])
-        ty = np.array(lbls[total - TEST_SIZE : ])
+        allx = list2csr(ftrs1[0 : total - TEST_SIZE])
+        ally = np.array(lbls1[0 : total - TEST_SIZE])
+        x = list2csr(ftrs1[0 : TRAIN_SIZE])
+        y = np.array(lbls1[0 : TRAIN_SIZE])
+        tx = list2csr(ftrs1[total - TEST_SIZE : ])
+        ty = np.array(lbls1[total - TEST_SIZE : ])
         test_index = list(range(total - TEST_SIZE, total))
 
         return allx, ally, x, y, tx, ty, test_index, id2idx
