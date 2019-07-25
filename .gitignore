@@ -104,6 +104,4 @@ ENV/
 .idea/
 
 # data
-.cora_data/
-.citeseer_data/
 .pre_trained/
