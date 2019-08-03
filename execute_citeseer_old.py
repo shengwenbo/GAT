@@ -175,26 +175,26 @@ with tf.Graph().as_default():
             test_lbls.append(y_test[0])
 
 
-        y = y_train + y_val + y_test
-        lbl_all = np.argmax(y[0], axis=-1).tolist()
-        for logs in test_logs:
-            pred = np.argmax(logs, axis=-1).tolist()
-
-            for p, r, i in zip(pred, lbl_all, range(len(pred))):
-                if p != r:
-                    print("ID: {}".format(i))
-                    print("Pred: {}, real: {}.".format(p, r))
-
-                    ftr = features[0, i, :]
-                    bias = biases[0, i, :]
-                    nbs = [j for j in range(len(pred)) if bias[j] > -1]
-                    ftr_nb = features[0, nbs, :]
-
-                    print("Neighbors: {}".format(nbs))
-                    # print("Feature: {}".format(ftr))
-                    print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
-                    # print("Neighbor Features: {}".format(ftr_nb))
-                    print()
+        # y = y_train + y_val + y_test
+        # lbl_all = np.argmax(y[0], axis=-1).tolist()
+        # for logs in test_logs:
+        #     pred = np.argmax(logs, axis=-1).tolist()
+        #
+        #     for p, r, i in zip(pred, lbl_all, range(len(pred))):
+        #         if p != r:
+        #             print("ID: {}".format(i))
+        #             print("Pred: {}, real: {}.".format(p, r))
+        #
+        #             ftr = features[0, i, :]
+        #             bias = biases[0, i, :]
+        #             nbs = [j for j in range(len(pred)) if bias[j] > -1]
+        #             ftr_nb = features[0, nbs, :]
+        #
+        #             print("Neighbors: {}".format(nbs))
+        #             # print("Feature: {}".format(ftr))
+        #             print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
+        #             # print("Neighbor Features: {}".format(ftr_nb))
+        #             print()
 
         print('Test loss:', ts_loss/ts_step, '; Test accuracy:', ts_acc/ts_step)
 

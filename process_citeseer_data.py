@@ -10,6 +10,8 @@ LBLS = ["Agents", "AI", "DB", "IR", "ML", "HCI"]
 TRAIN_SIZE = 120
 TEST_SIZE = 1000
 
+random.seed(1)
+
 def load_citeseer():
     graph = load_graph()
     linked_nodes = find_linked(graph)
@@ -26,7 +28,14 @@ def load_citeseer():
             idx_graph[idx_s] = []
         idx_graph[idx_s].append(idx_t)
 
-    objects = [allx, ally, idx_graph, tx, ty, x, y]
+    graph_new = {}
+    for s in range(len(id2idx.keys())):
+        if s in idx_graph.keys():
+            graph_new[s] = idx_graph[s]
+        else:
+            graph_new[s] = []
+
+    objects = [allx, ally, graph_new, tx, ty, x, y]
     i = 0
     for name in ["allx", "ally", "graph", "tx", "ty", "x", "y"]:
         with open(os.path.join(PATH, "ind.citeseer.{}".format(name)), 'wb') as f:
@@ -55,22 +64,24 @@ def load_content(linked_nodes):
             lbls.append(lbl2array(lbl))
             i += 1
 
-        isolated_nodes = linked_nodes - set(ids)
+        isolated_nodes = [n for n in linked_nodes if n not in ids]
+        ids_old = ids.copy()
         for node in isolated_nodes:
             ftrs.append(["0"]*len(ftrs[0]))
             lbls.append(lbl2array("None"))
             ids.append(node)
+            assert node not in id2idx.keys()
             id2idx[node] = i
             i += 1
 
         total = i
         print("nodes count:", total)
 
-        train_ids = random.sample(set(ids), k=TRAIN_SIZE)
-        test_ids = random.sample(list(set(ids) - set(train_ids)), k=TEST_SIZE)
-        other_ids = list(set(ids) - set(train_ids) - set(test_ids))
+        train_ids = random.sample(ids_old, k=TRAIN_SIZE)
+        test_ids = random.sample([n for n in ids_old if n not in train_ids], k=TEST_SIZE)
+        other_ids = [n for n in ids_old if n not in train_ids and n not in test_ids]
 
-        ids = train_ids + other_ids + test_ids
+        ids = train_ids + other_ids + isolated_nodes + test_ids
         idxs = [id2idx[id] for id in ids]
 
         ftrs1 = [ftrs[idx] for idx in idxs]
@@ -84,7 +95,7 @@ def load_content(linked_nodes):
         y = np.array(lbls1[0 : TRAIN_SIZE])
         tx = list2csr(ftrs1[total - TEST_SIZE : ])
         ty = np.array(lbls1[total - TEST_SIZE : ])
-        test_index = list(range(total - TEST_SIZE, total))
+        test_index = [id2idx[id] for id in test_ids]
 
         return allx, ally, x, y, tx, ty, test_index, id2idx
 
@@ -93,7 +104,9 @@ def load_graph():
         graph = []
         for line in fin.readlines():
             source, target = line.strip().split()
-            graph.append((source, target))
+            if source != target:
+                graph.append((source, target))
+                graph.append((target, source))
         return graph
 
 def find_linked(graph):
