@@ -2,7 +2,7 @@ import time
 import numpy as np
 import tensorflow as tf
 
-from models import GAT1
+from models import GAT
 from utils import process
 
 checkpt_file = 'pre_trained/cora/mod_cora.ckpt'
@@ -19,7 +19,7 @@ hid_units = [8] # numbers of hidden units per each attention head in each layer
 n_heads = [8, 1] # additional entry for the output layer
 residual = False
 nonlinearity = tf.nn.elu
-model = GAT1
+model = GAT
 
 print('Dataset: ' + dataset)
 print('----- Opt. hyperparams -----')
@@ -56,7 +56,6 @@ biases, adj = process.adj_to_bias(adj, [nb_nodes], nhood=1)
 with tf.Graph().as_default():
     with tf.name_scope('input'):
         ftr_in = tf.placeholder(dtype=tf.float32, shape=(batch_size, nb_nodes, ft_size))
-        adj_in = tf.placeholder(dtype=tf.float32, shape=(batch_size, nb_nodes, nb_nodes))
         bias_in = tf.placeholder(dtype=tf.float32, shape=(batch_size, nb_nodes, nb_nodes))
         lbl_in = tf.placeholder(dtype=tf.int32, shape=(batch_size, nb_nodes, nb_classes))
         msk_in = tf.placeholder(dtype=tf.int32, shape=(batch_size, nb_nodes))
@@ -66,7 +65,6 @@ with tf.Graph().as_default():
 
     logits = model.inference(ftr_in, nb_classes, nb_nodes, is_train,
                                 attn_drop, ffd_drop,
-                                adj = adj_in,
                                 bias_mat=bias_in,
                                 hid_units=hid_units, n_heads=n_heads,
                                 residual=residual, activation=nonlinearity)
@@ -102,7 +100,6 @@ with tf.Graph().as_default():
                 _, loss_value_tr, acc_tr = sess.run([train_op, loss, accuracy],
                     feed_dict={
                         ftr_in: features[tr_step*batch_size:(tr_step+1)*batch_size],
-                        adj_in: adj[tr_step*batch_size:(tr_step+1)*batch_size],
                         bias_in: biases[tr_step*batch_size:(tr_step+1)*batch_size],
                         lbl_in: y_train[tr_step*batch_size:(tr_step+1)*batch_size],
                         msk_in: train_mask[tr_step*batch_size:(tr_step+1)*batch_size],
@@ -119,7 +116,6 @@ with tf.Graph().as_default():
                 loss_value_vl, acc_vl = sess.run([loss, accuracy],
                     feed_dict={
                         ftr_in: features[vl_step*batch_size:(vl_step+1)*batch_size],
-                        adj_in: adj[vl_step * batch_size:(vl_step + 1) * batch_size],
                         bias_in: biases[vl_step*batch_size:(vl_step+1)*batch_size],
                         lbl_in: y_val[vl_step*batch_size:(vl_step+1)*batch_size],
                         msk_in: val_mask[vl_step*batch_size:(vl_step+1)*batch_size],
@@ -167,7 +163,6 @@ with tf.Graph().as_default():
             loss_value_ts, acc_ts, log = sess.run([loss, accuracy, log_resh],
                 feed_dict={
                     ftr_in: features[ts_step*batch_size:(ts_step+1)*batch_size],
-                    adj_in: adj[ts_step * batch_size:(ts_step + 1) * batch_size],
                     bias_in: biases[ts_step*batch_size:(ts_step+1)*batch_size],
                     lbl_in: y_test[ts_step*batch_size:(ts_step+1)*batch_size],
                     msk_in: test_mask[ts_step*batch_size:(ts_step+1)*batch_size],
