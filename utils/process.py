@@ -25,6 +25,45 @@ def adj_to_bias(adj, sizes, nhood=1):
     return -1e9 * (1.0 - mt)
 
 
+def devide_graph(features, adj, layers, max_neighs):
+    new_feats = []
+    subgraphs = []
+    sub_feats = []
+    sub_adjs = []
+    neighs = []
+
+    n_nodes = features.shape[1]
+    dims = features.shape[2]
+
+    adj0 = np.reshape(adj, [n_nodes, n_nodes])
+    adj1 = adj0.copy()
+    for _ in range(layers):
+        adj1 += np.matmul(adj1, adj0)
+
+    for center_id in range(n_nodes):
+        subgraph_ids = [id for id in range(n_nodes) if adj1[center_id, id] > 0]
+        neighs = len(subgraph_ids)
+        subgraphs.append(subgraph_ids)
+        sub_feat = np.zeros([max_neighs, dims])
+        sub_adj = np.zeros([max_neighs, max_neighs])
+
+        if neighs <= max_neighs:
+            sub_feat[0:neighs, :] = features[0, subgraph_ids, :]
+            sub_adj[0:neighs, 0:neighs] = adj[0, subgraph_ids, :][:, subgraph_ids]
+        else:
+            sub_feat = features[0, subgraph_ids, :][0:max_neighs, :]
+            sub_adj = adj[0, subgraph_ids, :][:, subgraph_ids][0:max_neighs, :][:, 0:max_neighs]
+        sub_feats.append(np.expand_dims(sub_feat, 0))
+        sub_adjs.append(np.expand_dims(sub_adj, 0))
+
+    sub_feats = np.concatenate(sub_feats, 0)
+    sub_adjs = np.concatenate(sub_adjs, 0)
+    sub_biases = adj_to_bias(sub_adjs, [max_neighs]*n_nodes)
+
+    return sub_feats, sub_adjs, sub_biases
+
+
+
 ###############################################
 # This section of code adapted from tkipf/gcn #
 ###############################################

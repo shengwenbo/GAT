@@ -10,13 +10,14 @@ checkpt_file = 'pre_trained/cora/mod_cora.ckpt'
 dataset = 'cora'
 
 # training params
-batch_size = 1
+batch_size = 256
 nb_epochs = 100000
 patience = 100
 lr = 0.005  # learning rate
 l2_coef = 0.0005  # weight decay
-hid_units = [8] # numbers of hidden units per each attention head in each layer
-n_heads = [8, 1] # additional entry for the output layer
+max_neighs = 128 # maximum number of neighbors
+hid_units = [8, 8] # numbers of hidden units per each attention head in each layer
+n_heads = [8, 4, 1] # additional entry for the output layer
 residual = False
 nonlinearity = tf.nn.elu
 model = GAT
@@ -44,21 +45,21 @@ adj = adj.todense()
 
 features = features[np.newaxis]
 adj = adj[np.newaxis]
-y_train = y_train[np.newaxis]
-y_val = y_val[np.newaxis]
-y_test = y_test[np.newaxis]
-train_mask = train_mask[np.newaxis]
-val_mask = val_mask[np.newaxis]
-test_mask = test_mask[np.newaxis]
 
 biases = process.adj_to_bias(adj, [nb_nodes], nhood=1)
 
+features, adj, biases = process.devide_graph(features, adj, len(n_heads), max_neighs)
+
+train_ids = [id for id in range(nb_nodes) if train_mask[id] == True]
+val_ids = [id for id in range(nb_nodes) if val_mask[id] == True]
+test_ids = [id for id in range(nb_nodes) if test_mask[id] == True]
+
 with tf.Graph().as_default():
     with tf.name_scope('input'):
-        ftr_in = tf.placeholder(dtype=tf.float32, shape=(batch_size, nb_nodes, ft_size))
-        bias_in = tf.placeholder(dtype=tf.float32, shape=(batch_size, nb_nodes, nb_nodes))
-        lbl_in = tf.placeholder(dtype=tf.int32, shape=(batch_size, nb_nodes, nb_classes))
-        msk_in = tf.placeholder(dtype=tf.int32, shape=(batch_size, nb_nodes))
+        ftr_in = tf.placeholder(dtype=tf.float32, shape=(None, max_neighs, ft_size))
+        bias_in = tf.placeholder(dtype=tf.float32, shape=(None, max_neighs, max_neighs))
+        lbl_in = tf.placeholder(dtype=tf.int32, shape=(None, nb_classes))
+        msk_in = tf.placeholder(dtype=tf.int32, shape=(None))
         attn_drop = tf.placeholder(dtype=tf.float32, shape=())
         ffd_drop = tf.placeholder(dtype=tf.float32, shape=())
         is_train = tf.placeholder(dtype=tf.bool, shape=())
@@ -93,16 +94,20 @@ with tf.Graph().as_default():
         val_acc_avg = 0
 
         for epoch in range(nb_epochs):
+            np.random.shuffle(train_ids)
+            np.random.shuffle(val_ids)
+
             tr_step = 0
-            tr_size = features.shape[0]
+            tr_size = len(train_ids)
 
             while tr_step * batch_size < tr_size:
-                _, loss_value_tr, acc_tr = sess.run([train_op, loss, accuracy],
+                ids = train_ids[tr_step*batch_size: (tr_step+1)*batch_size]
+                _, loss_value_tr, acc_tr, logits_tr = sess.run([train_op, loss, accuracy, logits],
                     feed_dict={
-                        ftr_in: features[tr_step*batch_size:(tr_step+1)*batch_size],
-                        bias_in: biases[tr_step*batch_size:(tr_step+1)*batch_size],
-                        lbl_in: y_train[tr_step*batch_size:(tr_step+1)*batch_size],
-                        msk_in: train_mask[tr_step*batch_size:(tr_step+1)*batch_size],
+                        ftr_in: features[ids],
+                        bias_in: biases[ids],
+                        lbl_in: y_train[ids],
+                        msk_in: train_mask[ids],
                         is_train: True,
                         attn_drop: 0.6, ffd_drop: 0.6})
                 train_loss_avg += loss_value_tr
@@ -110,15 +115,16 @@ with tf.Graph().as_default():
                 tr_step += 1
 
             vl_step = 0
-            vl_size = features.shape[0]
+            vl_size = len(val_ids)
 
             while vl_step * batch_size < vl_size:
+                ids = val_ids[vl_step*batch_size: (vl_step+1)*batch_size]
                 loss_value_vl, acc_vl = sess.run([loss, accuracy],
                     feed_dict={
-                        ftr_in: features[vl_step*batch_size:(vl_step+1)*batch_size],
-                        bias_in: biases[vl_step*batch_size:(vl_step+1)*batch_size],
-                        lbl_in: y_val[vl_step*batch_size:(vl_step+1)*batch_size],
-                        msk_in: val_mask[vl_step*batch_size:(vl_step+1)*batch_size],
+                        ftr_in: features[ids],
+                        bias_in: biases[ids],
+                        lbl_in: y_val[ids],
+                        msk_in: val_mask[ids],
                         is_train: False,
                         attn_drop: 0.0, ffd_drop: 0.0})
                 val_loss_avg += loss_value_vl
@@ -151,7 +157,7 @@ with tf.Graph().as_default():
 
         saver.restore(sess, checkpt_file)
 
-        ts_size = features.shape[0]
+        ts_size = len(test_ids)
         ts_step = 0
         ts_loss = 0.0
         ts_acc = 0.0
@@ -160,12 +166,13 @@ with tf.Graph().as_default():
         test_lbls = []
 
         while ts_step * batch_size < ts_size:
+            ids = test_ids[ts_step*batch_size:(ts_step+1)*batch_size]
             loss_value_ts, acc_ts, log = sess.run([loss, accuracy, log_resh],
                 feed_dict={
-                    ftr_in: features[ts_step*batch_size:(ts_step+1)*batch_size],
-                    bias_in: biases[ts_step*batch_size:(ts_step+1)*batch_size],
-                    lbl_in: y_test[ts_step*batch_size:(ts_step+1)*batch_size],
-                    msk_in: test_mask[ts_step*batch_size:(ts_step+1)*batch_size],
+                    ftr_in: features[ids],
+                    bias_in: biases[ids],
+                    lbl_in: y_test[ids],
+                    msk_in: test_mask[ids],
                     is_train: False,
                     attn_drop: 0.0, ffd_drop: 0.0})
             ts_loss += loss_value_ts
@@ -175,26 +182,26 @@ with tf.Graph().as_default():
             test_lbls.append(y_test[0])
 
 
-        y = y_train + y_val + y_test
-        lbl_all = np.argmax(y[0], axis=-1).tolist()
-        for logs in test_logs:
-            pred = np.argmax(logs, axis=-1).tolist()
-
-            for p, r, i in zip(pred, lbl_all, range(len(pred))):
-                if p != r:
-                    print("ID: {}".format(i))
-                    print("Pred: {}, real: {}.".format(p, r))
-
-                    ftr = features[0, i, :]
-                    bias = biases[0, i, :]
-                    nbs = [j for j in range(len(pred)) if bias[j] > -1]
-                    ftr_nb = features[0, nbs, :]
-
-                    print("Neighbors: {}".format(nbs))
-                    # print("Feature: {}".format(ftr))
-                    print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
-                    # print("Neighbor Features: {}".format(ftr_nb))
-                    print()
+        # y = y_train + y_val + y_test
+        # lbl_all = np.argmax(y[0], axis=-1).tolist()
+        # for logs in test_logs:
+        #     pred = np.argmax(logs, axis=-1).tolist()
+        #
+        #     for p, r, i in zip(pred, lbl_all, range(len(pred))):
+        #         if p != r:
+        #             print("ID: {}".format(i))
+        #             print("Pred: {}, real: {}.".format(p, r))
+        #
+        #             ftr = features[0, i, :]
+        #             bias = biases[0, i, :]
+        #             nbs = [j for j in range(len(pred)) if bias[j] > -1]
+        #             ftr_nb = features[0, nbs, :]
+        #
+        #             print("Neighbors: {}".format(nbs))
+        #             # print("Feature: {}".format(ftr))
+        #             print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
+        #             # print("Neighbor Features: {}".format(ftr_nb))
+        #             print()
 
         print('Test loss:', ts_loss/ts_step, '; Test accuracy:', ts_acc/ts_step)
 
