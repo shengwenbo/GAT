@@ -4,20 +4,21 @@ import tensorflow as tf
 
 from models import GAT
 from utils import process
+import scipy.sparse as sp
 
 checkpt_file = 'pre_trained/cora/mod_cora.ckpt'
 
 dataset = 'cora'
 
 # training params
-batch_size = 140
+batch_size = 50
 nb_epochs = 100000
 patience = 100
 lr = 0.005  # learning rate
-l2_coef = 0.0005  # weight decay
-max_neighs = 400 # maximum number of neighbors
+l2_coef = 0.001  # weight decay
+max_neighs = 500 # maximum number of neighbors
 hid_units = [8] # numbers of hidden units per each attention head in each layer
-n_heads = [8, 1] # additional entry for the output layer
+n_heads = [1, 1] # additional entry for the output layer
 residual = False
 nonlinearity = tf.nn.elu
 model = GAT
@@ -43,12 +44,18 @@ nb_classes = y_train.shape[1]
 
 adj = adj.todense()
 
-features = features[np.newaxis]
-adj = adj[np.newaxis]
+# features = features[np.newaxis]
+# adj = adj[np.newaxis]
 
 biases = process.adj_to_bias(adj, [nb_nodes], nhood=1)
 
-features, adj, biases = process.devide_graph(features, adj, len(n_heads), max_neighs)
+ids_real = process.devide_graph(features, adj, len(n_heads), max_neighs)
+
+features = np.concatenate([features, np.zeros([1, ft_size])], 0)
+adj = np.concatenate([adj, np.zeros([nb_nodes, 1])], 1)
+adj = np.concatenate([adj, np.zeros([1, nb_nodes + 1])], 0)
+
+# adj = adj + sp.eye(nb_nodes)
 
 train_ids = [id for id in range(nb_nodes) if train_mask[id] == True]
 val_ids = [id for id in range(nb_nodes) if val_mask[id] == True]
@@ -56,17 +63,17 @@ test_ids = [id for id in range(nb_nodes) if test_mask[id] == True]
 
 with tf.Graph().as_default():
     with tf.name_scope('input'):
-        ftr_in = tf.placeholder(dtype=tf.float32, shape=(None, max_neighs, ft_size))
-        bias_in = tf.placeholder(dtype=tf.float32, shape=(None, max_neighs, max_neighs))
-        lbl_in = tf.placeholder(dtype=tf.int32, shape=(None, nb_classes))
-        msk_in = tf.placeholder(dtype=tf.int32, shape=(None))
+        ftr_in = tf.placeholder(dtype=tf.float32, shape=(nb_nodes + 1, ft_size))
+        adj_in = tf.placeholder(dtype=tf.float32, shape=(nb_nodes + 1, nb_nodes + 1))
+        ids_in = tf.placeholder(dtype=tf.int32, shape=(batch_size, max_neighs))
+        lbl_in = tf.placeholder(dtype=tf.int32, shape=(batch_size, nb_classes))
+        msk_in = tf.placeholder(dtype=tf.int32, shape=(batch_size))
         attn_drop = tf.placeholder(dtype=tf.float32, shape=())
         ffd_drop = tf.placeholder(dtype=tf.float32, shape=())
         is_train = tf.placeholder(dtype=tf.bool, shape=())
 
-    logits = model.inference(ftr_in, nb_classes, max_neighs, is_train,
+    logits = model.inference([ids_in, ftr_in, adj_in], nb_classes, max_neighs, is_train,
                                 attn_drop, ffd_drop,
-                                bias_mat=bias_in,
                                 hid_units=hid_units, n_heads=n_heads,
                                 residual=residual, activation=nonlinearity)
     log_resh = tf.reshape(logits, [-1, nb_classes])
@@ -101,28 +108,34 @@ with tf.Graph().as_default():
             tr_size = len(train_ids)
 
             while tr_step * batch_size < tr_size:
-                ids = train_ids[tr_step*batch_size: (tr_step+1)*batch_size]
+                if (tr_step + 1)*batch_size < tr_size:
+                    ids = train_ids[tr_step*batch_size: (tr_step+1)*batch_size]
+                else:
+                    ids = train_ids[tr_step*batch_size: ] + train_ids[0: (tr_step+1)*batch_size - tr_size]
                 _, loss_value_tr, acc_tr, logits_tr = sess.run([train_op, loss, accuracy, logits],
                     feed_dict={
-                        ftr_in: features[ids],
-                        bias_in: biases[ids],
+                        ids_in: ids_real[ids],
+                        ftr_in: features,
+                        adj_in: adj,
                         lbl_in: y_train[ids],
                         msk_in: train_mask[ids],
                         is_train: True,
                         attn_drop: 0.6, ffd_drop: 0.6})
                 train_loss_avg += loss_value_tr
                 train_acc_avg += acc_tr
+
                 tr_step += 1
 
             vl_step = 0
-            vl_size = len(val_ids)
+            vl_size = len(val_ids)//5
 
             while vl_step * batch_size < vl_size:
                 ids = val_ids[vl_step*batch_size: (vl_step+1)*batch_size]
                 loss_value_vl, acc_vl = sess.run([loss, accuracy],
                     feed_dict={
-                        ftr_in: features[ids],
-                        bias_in: biases[ids],
+                        ids_in: ids_real[ids],
+                        ftr_in: features,
+                        adj_in: adj,
                         lbl_in: y_val[ids],
                         msk_in: val_mask[ids],
                         is_train: False,
@@ -169,8 +182,9 @@ with tf.Graph().as_default():
             ids = test_ids[ts_step*batch_size:(ts_step+1)*batch_size]
             loss_value_ts, acc_ts, log = sess.run([loss, accuracy, log_resh],
                 feed_dict={
-                    ftr_in: features[ids],
-                    bias_in: biases[ids],
+                    ids_in: ids_real[ids],
+                    ftr_in: features,
+                    adj_in: adj,
                     lbl_in: y_test[ids],
                     msk_in: test_mask[ids],
                     is_train: False,

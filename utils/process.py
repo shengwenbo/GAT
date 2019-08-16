@@ -2,6 +2,7 @@ import numpy as np
 import pickle as pkl
 import networkx as nx
 import scipy.sparse as sp
+import random
 from scipy.sparse.linalg.eigen.arpack import eigsh
 import sys
 
@@ -12,6 +13,8 @@ import sys
  Expected shape: [graph, nodes, nodes]
 """
 def adj_to_bias(adj, sizes, nhood=1):
+    if len(adj.shape) == 2:
+        adj = np.expand_dims(adj, 0)
     nb_graphs = adj.shape[0]
     mt = np.empty(adj.shape)
     for g in range(nb_graphs):
@@ -26,14 +29,9 @@ def adj_to_bias(adj, sizes, nhood=1):
 
 
 def devide_graph(features, adj, layers, max_neighs):
-    new_feats = []
     subgraphs = []
-    sub_feats = []
-    sub_adjs = []
-    neighs = []
 
-    n_nodes = features.shape[1]
-    dims = features.shape[2]
+    n_nodes = features.shape[0]
 
     adj0 = np.reshape(adj, [n_nodes, n_nodes])
     adj1 = adj0.copy()
@@ -44,29 +42,43 @@ def devide_graph(features, adj, layers, max_neighs):
     for center_id in range(n_nodes):
         subgraph_ids = [id for id in range(n_nodes) if adj1[center_id, id] > 0]
         neighs = len(subgraph_ids)
-        subgraphs.append(subgraph_ids)
-        sub_feat = np.zeros([max_neighs, dims])
-        sub_adj = np.zeros([max_neighs, max_neighs])
 
-        if neighs <= max_neighs:
-            sub_feat[0:neighs, :] = features[0, subgraph_ids, :]
-            sub_adj[0:neighs, 0:neighs] = adj[0, subgraph_ids, :][:, subgraph_ids]
+        if neighs < max_neighs:
+            subgraph_ids += [n_nodes]*(max_neighs - neighs)
         else:
+            subgraph_ids = subgraph_ids[0:max_neighs]
             del_id.append(center_id)
-            sub_feat = features[0, subgraph_ids, :][0:max_neighs, :]
-            sub_adj = adj[0, subgraph_ids, :][:, subgraph_ids][0:max_neighs, :][:, 0:max_neighs]
-        sub_feats.append(np.expand_dims(sub_feat, 0))
-        sub_adjs.append(np.expand_dims(sub_adj, 0))
+        subgraphs.append(subgraph_ids)
 
     print("{} nodes incomplete: {}".format(len(del_id), del_id))
 
-    sub_feats = np.concatenate(sub_feats, 0)
-    sub_adjs = np.concatenate(sub_adjs, 0)
-    sub_biases = adj_to_bias(sub_adjs, [max_neighs]*n_nodes)
+    return np.array(subgraphs)
 
-    return sub_feats, sub_adjs, sub_biases
+def devide_graph_fake(features, adj, layers, max_neighs):
+    subgraphs = []
 
+    n_nodes = features.shape[0]
 
+    adj0 = np.reshape(adj, [n_nodes, n_nodes])
+    adj1 = adj0.copy()
+    for _ in range(layers):
+        adj1 += np.matmul(adj1, adj0)
+
+    del_id = []
+    for center_id in range(n_nodes):
+        subgraph_ids = [id for id in range(n_nodes) if adj1[center_id, id] > 0]
+        subgraph_ids = list(set(list(range(n_nodes))) - set(subgraph_ids))
+        subgraph_ids = random.sample(subgraph_ids, random.randint(3, max_neighs//5))
+        subgraph_ids[0] = center_id
+        neighs = len(subgraph_ids)
+
+        if neighs < max_neighs:
+            subgraph_ids += [n_nodes]*(max_neighs - neighs)
+        else:
+            subgraph_ids = subgraph_ids[0:max_neighs]
+        subgraphs.append(subgraph_ids)
+
+    return np.array(subgraphs)
 
 ###############################################
 # This section of code adapted from tkipf/gcn #

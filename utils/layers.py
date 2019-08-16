@@ -35,6 +35,46 @@ def attn_head(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0, res
 
         return activation(ret)  # activation
 
+def attn_head1(seq, out_sz, adj, bias_mat, activation, classes=4, in_drop=0.0, coef_drop=0.0, residual=False):
+    nb_nodes = seq.shape[1]
+    with tf.name_scope('my_attn'):
+        if in_drop != 0.0:
+            seq = tf.nn.dropout(seq, 1.0 - in_drop)
+
+        seq_fts = tf.layers.conv1d(seq, out_sz, 1, use_bias=False)
+
+        class_fts = tf.layers.conv1d(seq, classes, 1, use_bias=False)
+        class_logs = tf.nn.softmax(tf.nn.leaky_relu(class_fts), -1)
+        class_logs = tf.transpose(class_logs, [2, 0, 1])
+
+        class_logs = tf.expand_dims(class_logs, -2)
+        adj = tf.expand_dims(adj, 0)
+        class_adj = class_logs * adj
+        nei_fts = tf.tile(seq_fts, [classes, 1, 1])
+        nei_fts = tf.reshape(nei_fts, [classes, -1, nb_nodes, out_sz])
+        nei_fts = tf.matmul(class_adj, nei_fts)
+        nei_fts = tf.transpose(nei_fts, [1, 2, 0, 3])
+
+        seq_dense = seq_fts
+        nei_dense = nei_fts
+        seq_dense = tf.expand_dims(seq_dense, 2)
+        wei = seq_dense * nei_dense
+        wei = tf.reduce_sum(wei, -1)
+        wei = tf.nn.softmax(tf.nn.leaky_relu(wei), -1)
+        wei = tf.expand_dims(wei, -1)
+
+        if coef_drop is not None:
+            wei = tf.nn.dropout(wei, 1-coef_drop)
+        if in_drop is not None:
+            nei_fts = tf.nn.dropout(nei_fts, 1-in_drop)
+
+        nei_values = wei * nei_fts
+        nei_values = tf.reduce_sum(nei_values, 2)
+
+        ret = seq_fts + nei_values
+
+        return activation(ret)  # activation
+
 # Experimental sparse attention head (for running on datasets such as Pubmed)
 # N.B. Because of limitations of current TF implementation, will work _only_ if batch_size = 1!
 def sp_attn_head(seq, out_sz, adj_mat, activation, nb_nodes, in_drop=0.0, coef_drop=0.0, residual=False):
