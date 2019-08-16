@@ -9,11 +9,13 @@ def attn_head(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0, res
             seq = tf.nn.dropout(seq, 1.0 - in_drop)
 
         seq_fts = tf.layers.conv1d(seq, out_sz, 1, use_bias=False)
+        center_ft = seq_fts[:, 0:1, :]
 
         # simplest self-attention possible
+        f_0 = tf.layers.conv1d(center_ft, 1, 1)
         f_1 = tf.layers.conv1d(seq_fts, 1, 1)
         f_2 = tf.layers.conv1d(seq_fts, 1, 1)
-        logits = f_1 + tf.transpose(f_2, [0, 2, 1])
+        logits = f_1 + tf.transpose(f_2, [0, 2, 1]) + f_0
         coefs = tf.nn.softmax(tf.nn.leaky_relu(logits) + bias_mat)
 
         if coef_drop != 0.0:

@@ -78,7 +78,7 @@ def sample_mask(idx, l):
 
 
 dataset = 'reddit'
-old_prefix = 'C:/reddit_new/reddit'
+old_prefix = 'D:/data/reddit_10-0/reddit'
 
 adj, features, y, train_mask, val_mask, test_mask = load_data(dataset)
 

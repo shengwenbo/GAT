@@ -40,6 +40,7 @@ def devide_graph(features, adj, layers, max_neighs):
     for _ in range(layers):
         adj1 += np.matmul(adj1, adj0)
 
+    del_id = []
     for center_id in range(n_nodes):
         subgraph_ids = [id for id in range(n_nodes) if adj1[center_id, id] > 0]
         neighs = len(subgraph_ids)
@@ -51,10 +52,13 @@ def devide_graph(features, adj, layers, max_neighs):
             sub_feat[0:neighs, :] = features[0, subgraph_ids, :]
             sub_adj[0:neighs, 0:neighs] = adj[0, subgraph_ids, :][:, subgraph_ids]
         else:
+            del_id.append(center_id)
             sub_feat = features[0, subgraph_ids, :][0:max_neighs, :]
             sub_adj = adj[0, subgraph_ids, :][:, subgraph_ids][0:max_neighs, :][:, 0:max_neighs]
         sub_feats.append(np.expand_dims(sub_feat, 0))
         sub_adjs.append(np.expand_dims(sub_adj, 0))
+
+    print("{} nodes incomplete: {}".format(len(del_id), del_id))
 
     sub_feats = np.concatenate(sub_feats, 0)
     sub_adjs = np.concatenate(sub_adjs, 0)
