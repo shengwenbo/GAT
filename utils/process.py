@@ -4,6 +4,9 @@ import networkx as nx
 import scipy.sparse as sp
 from scipy.sparse.linalg.eigen.arpack import eigsh
 import sys
+import random
+
+random.seed(100)
 
 """
  Prepare adjacency matrix by expanding up to a given neighbourhood.
@@ -42,7 +45,7 @@ def sample_mask(idx, l):
     mask[idx] = 1
     return np.array(mask, dtype=np.bool)
 
-def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
+def load_data(dataset_str, train_size=None): # {'pubmed', 'citeseer', 'cora'}
     """Load data."""
 
     if dataset_str == "reddit":
@@ -82,6 +85,10 @@ def load_data(dataset_str): # {'pubmed', 'citeseer', 'cora'}
     idx_test = test_idx_range.tolist()
     idx_train = range(len(y))
     idx_val = range(len(y), len(y)+500)
+
+    if train_size is not None:
+        idx_train = random.sample(idx_train, train_size)
+        list.sort(idx_train)
 
     train_mask = sample_mask(idx_train, labels.shape[0])
     val_mask = sample_mask(idx_val, labels.shape[0])

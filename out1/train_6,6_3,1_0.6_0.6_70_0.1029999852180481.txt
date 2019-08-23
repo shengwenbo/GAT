@@ -1,0 +1,5 @@
+Hid units: [8] ; Num heads: [3, 1] 
+Split mode: train ; Split parts: [6, 6] 
+In drop: 0.6 ; Coef drop: 0.6 
+Total epochs: 1999 
+Test loss: 1.9473497867584229 ; Test accuracy: 0.1029999852180481 
