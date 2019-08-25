@@ -12,9 +12,7 @@ def attn_head(seq, out_sz, bias_mat, activation, split_mode="random_const", spli
         seq_fts = tf.layers.conv1d(seq, out_sz, 1, use_bias=False)
 
         if split_mode == "random_const":
-            sp_wei = np.random.normal(size=(split_parts, out_sz))
-            sp_wei = np.exp(sp_wei)/np.sum(sp_wei,axis=0)
-            sp_wei = tf.constant(sp_wei, dtype=tf.float32)
+            sp_wei = sp_wei
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, sp, d]
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, 1, sp, d]
         elif split_mode == "random":
@@ -24,12 +22,12 @@ def attn_head(seq, out_sz, bias_mat, activation, split_mode="random_const", spli
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, 1, sp, d]
         elif split_mode == "train":
             sp_wei = tf.get_variable("sp_wei_" + name, [split_parts, out_sz])
-            sp_wei = tf.nn.softmax(sp_wei, axis=0)  # [sp, d]
+            # sp_wei = tf.nn.softmax(sp_wei, axis=0)  # [sp, d]
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, sp, d]
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, 1, sp, d]
         elif split_mode == "train_share":
             sp_wei = sp_wei
-            sp_wei = tf.nn.softmax(sp_wei, axis=0)  # [sp, d]
+            # sp_wei = tf.nn.softmax(sp_wei, axis=0)  # [sp, d]
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, sp, d]
             sp_wei = tf.expand_dims(sp_wei, 0)  # [1, 1, sp, d]
         elif split_mode == "train_no_softmax":
@@ -75,7 +73,35 @@ def attn_head(seq, out_sz, bias_mat, activation, split_mode="random_const", spli
 
         return activation(ret)  # activation
 
+def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0, residual=False):
+    with tf.name_scope('my_attn'):
+        if in_drop != 0.0:
+            seq = tf.nn.dropout(seq, 1.0 - in_drop)
 
+        seq_fts = tf.layers.conv1d(seq, out_sz, 1, use_bias=False)
+
+        # simplest self-attention possible
+        f_1 = tf.layers.conv1d(seq_fts, 1, 1)
+        f_2 = tf.layers.conv1d(seq_fts, 1, 1)
+        logits = f_1 + tf.transpose(f_2, [0, 2, 1])
+        coefs = tf.nn.softmax(tf.nn.leaky_relu(logits) + bias_mat)
+
+        if coef_drop != 0.0:
+            coefs = tf.nn.dropout(coefs, 1.0 - coef_drop)
+        if in_drop != 0.0:
+            seq_fts = tf.nn.dropout(seq_fts, 1.0 - in_drop)
+
+        vals = tf.matmul(coefs, seq_fts)
+        ret = tf.contrib.layers.bias_add(vals)
+
+        # residual connection
+        if residual:
+            if seq.shape[-1] != ret.shape[-1]:
+                ret = ret + conv1d(seq, ret.shape[-1], 1) # activation
+            else:
+                seq_fts = ret + seq
+
+        return activation(ret)  # activation
 
 # Experimental sparse attention head (for running on datasets such as Pubmed)
 # N.B. Because of limitations of current TF implementation, will work _only_ if batch_size = 1!

@@ -1,0 +1,5 @@
+Hid units: [8] ; Num heads: [8, 1] 
+Split mode: origin ; Split parts: [1, 1] 
+In drop: 0.6 ; Coef drop: 0.6 
+Total epochs: 790 
+Test loss: 1.2329400777816772 ; Test accuracy: 0.7819998860359192 

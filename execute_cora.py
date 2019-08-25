@@ -2,8 +2,9 @@ import time
 import numpy as np
 import tensorflow as tf
 import sys
+import os
 
-from models import GAT
+from models import GAT, GAT_old
 from utils import process
 
 dataset = 'cora'
@@ -19,6 +20,7 @@ hid_units = [8] # numbers of hidden units per each attention head in each layer
 residual = False
 nonlinearity = tf.nn.elu
 model = GAT
+log_every = 10
 
 if __name__ == "__main__":
     checkpt_file = 'pre_trained/cora/mod_cora.ckpt'
@@ -30,6 +32,8 @@ if __name__ == "__main__":
     in_drop = float(sys.argv[4])
     coef_drop = float(sys.argv[5])
     train_size = int(sys.argv[6])
+    out_dir = sys.argv[7]
+    log_dir = sys.argv[8]
 
     print('Dataset: ' + dataset)
     print('----- Opt. hyperparams -----')
@@ -43,7 +47,7 @@ if __name__ == "__main__":
     print('nonlinearity: ' + str(nonlinearity))
     print('model: ' + str(model))
 
-    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, train_size)
+    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, train_size, class_balanced=True)
     features, spars = process.preprocess_features(features)
 
     nb_nodes = features.shape[0]
@@ -73,7 +77,15 @@ if __name__ == "__main__":
             ffd_drop = tf.placeholder(dtype=tf.float32, shape=())
             is_train = tf.placeholder(dtype=tf.bool, shape=())
 
-        logits = model.inference(ftr_in, nb_classes, nb_nodes, is_train,
+        if split_mode == "origin":
+            model = GAT_old
+            logits = model.inference(ftr_in, nb_classes, nb_nodes, is_train,
+                                    attn_drop, ffd_drop,
+                                    bias_mat=bias_in,
+                                    hid_units=hid_units, n_heads=n_heads,
+                                    residual=residual, activation=nonlinearity)
+        else:
+            logits = model.inference(ftr_in, nb_classes, nb_nodes, is_train,
                                     attn_drop, ffd_drop,
                                     split_mode=split_mode, split_parts=split_parts,
                                     bias_mat=bias_in,
@@ -84,6 +96,18 @@ if __name__ == "__main__":
         msk_resh = tf.reshape(msk_in, [-1])
         loss = model.masked_softmax_cross_entropy(log_resh, lab_resh, msk_resh)
         accuracy = model.masked_accuracy(log_resh, lab_resh, msk_resh)
+
+        tf.summary.scalar("loss", loss)
+        tf.summary.scalar("acc", accuracy)
+        merged = tf.summary.merge_all()
+
+        train_log_dir = "{}/train/{}".format(log_dir, "_".join(sys.argv[1:7]))
+        val_log_dir = "{}/val/{}".format(log_dir, "_".join(sys.argv[1:7]))
+        for dir in [train_log_dir, val_log_dir]:
+            if os.path.exists(dir):
+                os.rmdir(dir)
+        train_log_writer = tf.summary.FileWriter(train_log_dir, tf.get_default_graph())
+        val_log_writer = tf.summary.FileWriter(val_log_dir)
 
         train_op = model.training(loss, lr, l2_coef)
 
@@ -108,7 +132,7 @@ if __name__ == "__main__":
                 tr_size = features.shape[0]
 
                 while tr_step * batch_size < tr_size:
-                    _, loss_value_tr, acc_tr = sess.run([train_op, loss, accuracy],
+                    _, loss_value_tr, acc_tr, summary_tr = sess.run([train_op, loss, accuracy, merged],
                         feed_dict={
                             ftr_in: features[tr_step*batch_size:(tr_step+1)*batch_size],
                             bias_in: biases[tr_step*batch_size:(tr_step+1)*batch_size],
@@ -116,6 +140,8 @@ if __name__ == "__main__":
                             msk_in: train_mask[tr_step*batch_size:(tr_step+1)*batch_size],
                             is_train: True,
                             attn_drop: in_drop, ffd_drop: coef_drop})
+                    if epoch%log_every == 0:
+                        train_log_writer.add_summary(summary_tr, epoch)
                     train_loss_avg += loss_value_tr
                     train_acc_avg += acc_tr
                     tr_step += 1
@@ -124,7 +150,7 @@ if __name__ == "__main__":
                 vl_size = features.shape[0]
 
                 while vl_step * batch_size < vl_size:
-                    loss_value_vl, acc_vl = sess.run([loss, accuracy],
+                    loss_value_vl, acc_vl, summary_vl = sess.run([loss, accuracy, merged],
                         feed_dict={
                             ftr_in: features[vl_step*batch_size:(vl_step+1)*batch_size],
                             bias_in: biases[vl_step*batch_size:(vl_step+1)*batch_size],
@@ -132,6 +158,8 @@ if __name__ == "__main__":
                             msk_in: val_mask[vl_step*batch_size:(vl_step+1)*batch_size],
                             is_train: False,
                             attn_drop: 0.0, ffd_drop: 0.0})
+                    if epoch % log_every == 0:
+                        val_log_writer.add_summary(summary_vl, epoch)
                     val_loss_avg += loss_value_vl
                     val_acc_avg += acc_vl
                     vl_step += 1
@@ -186,28 +214,30 @@ if __name__ == "__main__":
                 test_lbls.append(y_test[0])
 
 
-            y = y_train + y_val + y_test
-            lbl_all = np.argmax(y[0], axis=-1).tolist()
-            for logs in test_logs:
-                pred = np.argmax(logs, axis=-1).tolist()
+            # y = y_train + y_val + y_test
+            # lbl_all = np.argmax(y[0], axis=-1).tolist()
+            # for logs in test_logs:
+            #     pred = np.argmax(logs, axis=-1).tolist()
+            #
+            #     for p, r, i in zip(pred, lbl_all, range(len(pred))):
+            #         if p != r:
+            #             print("ID: {}".format(i))
+            #             print("Pred: {}, real: {}.".format(p, r))
+            #
+            #             ftr = features[0, i, :]
+            #             bias = biases[0, i, :]
+            #             nbs = [j for j in range(len(pred)) if bias[j] > -1]
+            #             ftr_nb = features[0, nbs, :]
+            #
+            #             print("Neighbors: {}".format(nbs))
+            #             # print("Feature: {}".format(ftr))
+            #             print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
+            #             # print("Neighbor Features: {}".format(ftr_nb))
+            #             print()
 
-                for p, r, i in zip(pred, lbl_all, range(len(pred))):
-                    if p != r:
-                        print("ID: {}".format(i))
-                        print("Pred: {}, real: {}.".format(p, r))
-
-                        ftr = features[0, i, :]
-                        bias = biases[0, i, :]
-                        nbs = [j for j in range(len(pred)) if bias[j] > -1]
-                        ftr_nb = features[0, nbs, :]
-
-                        print("Neighbors: {}".format(nbs))
-                        # print("Feature: {}".format(ftr))
-                        print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
-                        # print("Neighbor Features: {}".format(ftr_nb))
-                        print()
-
-            with open("out/{}_{}.txt".format("_".join(sys.argv[1:]), ts_acc/ts_step), "w") as fout:
+            if not os.path.exists(out_dir):
+                os.mkdir(out_dir)
+            with open("{}/{}_{}.txt".format(out_dir, "_".join(sys.argv[1:7]), ts_acc/ts_step), "w") as fout:
                 fout.write("{} {} {} {} {}".format("Hid units:", hid_units, "; Num heads:", n_heads, "\n"))
                 fout.write("{} {} {} {} {}".format("Split mode:", split_mode, "; Split parts:", split_parts, "\n"))
                 fout.write("{} {} {} {} {}".format("In drop:", in_drop, "; Coef drop:", coef_drop, "\n"))

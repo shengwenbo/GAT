@@ -45,7 +45,7 @@ def sample_mask(idx, l):
     mask[idx] = 1
     return np.array(mask, dtype=np.bool)
 
-def load_data(dataset_str, train_size=None): # {'pubmed', 'citeseer', 'cora'}
+def load_data(dataset_str, train_size=None, class_balanced=False): # {'pubmed', 'citeseer', 'cora'}
     """Load data."""
 
     if dataset_str == "reddit":
@@ -87,7 +87,21 @@ def load_data(dataset_str, train_size=None): # {'pubmed', 'citeseer', 'cora'}
     idx_val = range(len(y), len(y)+500)
 
     if train_size is not None:
-        idx_train = random.sample(idx_train, train_size)
+        if class_balanced:
+            tr_total = len(y)
+            class_ids = []
+            for c in range(y.shape[1]):
+                class_ids.append([id for id in idx_train if y[id][c] > 0.5])
+            class_nbs_total = [len(i) for i in class_ids]
+            class_nbs_tr = [i * train_size // tr_total for i in class_nbs_total]
+            class_nbs_tr[-1] = train_size - np.sum(class_nbs_tr[0:-1])
+            idx_choosen = []
+            for c_id, c_nb in zip(class_ids, class_nbs_tr):
+                idx_choosen += random.sample(c_id, c_nb)
+            idx_train = idx_choosen
+        else:
+            idx_train = random.sample(idx_train, train_size)
+
         list.sort(idx_train)
 
     train_mask = sample_mask(idx_train, labels.shape[0])
