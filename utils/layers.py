@@ -82,7 +82,7 @@ def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0,
 
         return activation(ret)  # activation
 
-def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
+def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, attn_size=16, sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
     if sparse:
         n_nodes = ids.dense_shape[1]
     else:
@@ -103,9 +103,7 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, sp_
         cnt_fts = seq_fts[:, 0:1, :] # [bs, 1, d]
 
         # simplest self-attention possible
-        f_1 = tf.layers.dense(cnt_fts, 1, use_bias=False) # [bs, 1, 1]
-        f_2 = tf.layers.dense(seq_fts_sp, 1, use_bias=False) # [bs, n, sp, 1]
-        logits = tf.expand_dims(f_1, 1) + tf.transpose(f_2, [0, 1, 3, 2]) # [bs, n, 1, sp]
+        logits = attn(tf.expand_dims(cnt_fts, 1), seq_fts_sp, attn_size) # [bs, n, 1, sp]
         in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=-1) # [bs, n, 1, sp]
 
         # if coef_drop != 0.0:
@@ -115,9 +113,7 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, sp_
 
         new_seq_fts = tf.matmul(in_coefs, seq_fts_sp) # [bs, n, 1, d]
         new_seq_fts = tf.reshape(new_seq_fts, [-1, n_nodes, out_sz]) # [bs, n, d]
-        f_1_new = tf.layers.dense(cnt_fts, 1, use_bias=False)  # [bs, 1, 1]
-        f_2_new = tf.layers.dense(new_seq_fts, 1, use_bias=False)  # [bs, n, 1]
-        logits_new = f_1_new + tf.transpose(f_2_new, [0, 2, 1])  # [bs, 1, n]
+        logits_new = attn(cnt_fts, new_seq_fts, attn_size) # [bs, 1, n]
         coefs = tf.nn.softmax(tf.nn.leaky_relu(logits_new), axis=-1) # [bs, 1, n]
 
         if coef_drop != 0.0:
@@ -260,3 +256,13 @@ def sp_attn_head_old(seq, out_sz, adj_mat, activation, nb_nodes, split_parts=4, 
                 seq_fts = ret + seq
 
         return activation(ret)  # activation
+
+def attn(f1, f2, attn_size):
+
+    f1 = tf.layers.dense(f1, attn_size)
+    f2 = tf.layers.dense(f2, attn_size)
+    logits = f1 * f2
+    logits = tf.reduce_sum(logits, -1)
+    logits = tf.expand_dims(logits, -2)
+
+    return logits
