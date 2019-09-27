@@ -10,7 +10,7 @@ class SpGAT(BaseGAttN):
             residual=False):
         attns = []
         for _ in range(n_heads[0]):
-            attns.append(layers.sp_attn_head(inputs,  
+            attns.append(layers.sp_attn_head_old(inputs,
                 adj_mat=bias_mat,
                 out_sz=hid_units[0], activation=activation, nb_nodes=nb_nodes,
                 in_drop=ffd_drop, coef_drop=attn_drop, residual=False))
@@ -19,14 +19,14 @@ class SpGAT(BaseGAttN):
             h_old = h_1
             attns = []
             for _ in range(n_heads[i]):
-                attns.append(layers.sp_attn_head(h_1,  
+                attns.append(layers.sp_attn_head_old(h_1,
                     adj_mat=bias_mat,
                     out_sz=hid_units[i], activation=activation, nb_nodes=nb_nodes,
                     in_drop=ffd_drop, coef_drop=attn_drop, residual=residual))
             h_1 = tf.concat(attns, axis=-1)
         out = []
         for i in range(n_heads[-1]):
-            out.append(layers.sp_attn_head(h_1, adj_mat=bias_mat,
+            out.append(layers.sp_attn_head_old(h_1, adj_mat=bias_mat,
                 out_sz=nb_classes, activation=lambda x: x, nb_nodes=nb_nodes,
                 in_drop=ffd_drop, coef_drop=attn_drop, residual=False))
         logits = tf.add_n(out) / n_heads[-1]

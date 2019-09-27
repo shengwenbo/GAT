@@ -3,16 +3,19 @@ import numpy as np
 import tensorflow as tf
 import sys
 import os
+import shutil
 
 from models import GAT, GAT_old
 from utils import process
 
+# dataset = 'citeseer'
 dataset = 'cora'
 
 # training params
 batch_size = 1
-nb_epochs = 2000
-patience = 100
+nb_epochs = 200
+input_dim = 512
+patience = 20
 lr = 0.005  # learning rate
 l2_coef = 0.0005  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
@@ -34,6 +37,9 @@ if __name__ == "__main__":
     train_size = int(sys.argv[6])
     out_dir = sys.argv[7]
     log_dir = sys.argv[8]
+
+    turn = int(out_dir.strip().split("/")[-1])
+    tf.random_normal_initializer.seed = turn
 
     print('Dataset: ' + dataset)
     print('----- Opt. hyperparams -----')
@@ -79,13 +85,13 @@ if __name__ == "__main__":
 
         if split_mode == "origin":
             model = GAT_old
-            logits = model.inference(ftr_in, nb_classes, nb_nodes, is_train,
+            logits = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
                                     attn_drop, ffd_drop,
                                     bias_mat=bias_in,
                                     hid_units=hid_units, n_heads=n_heads,
                                     residual=residual, activation=nonlinearity)
         else:
-            logits = model.inference(ftr_in, nb_classes, nb_nodes, is_train,
+            logits = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
                                     attn_drop, ffd_drop,
                                     split_mode=split_mode, split_parts=split_parts,
                                     bias_mat=bias_in,
@@ -105,7 +111,7 @@ if __name__ == "__main__":
         val_log_dir = "{}/val/{}".format(log_dir, "_".join(sys.argv[1:7]))
         for dir in [train_log_dir, val_log_dir]:
             if os.path.exists(dir):
-                os.rmdir(dir)
+                shutil.rmtree(dir)
         train_log_writer = tf.summary.FileWriter(train_log_dir, tf.get_default_graph())
         val_log_writer = tf.summary.FileWriter(val_log_dir)
 

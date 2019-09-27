@@ -5,9 +5,10 @@ from utils import layers
 from models.base_gattn import BaseGAttN
 
 class GAT(BaseGAttN):
-    def inference(inputs, nb_classes, nb_nodes, training, attn_drop, ffd_drop,
+    def inference(inputs, nb_classes, nb_nodes, input_dim, training, attn_drop, ffd_drop,
             bias_mat, hid_units, n_heads, split_mode, split_parts, activation=tf.nn.elu, residual=False):
         attns = []
+        # inputs = tf.layers.dense(inputs,input_dim, use_bias=False, kernel_initializer=tf.random_normal_initializer, trainable=False)
         if split_mode == "train_share":
             sp_wei = tf.get_variable("sp_wei_{}".format("in"), [split_parts[0], hid_units[0]])
         elif split_mode == "random_const":
@@ -59,9 +60,10 @@ class GAT(BaseGAttN):
 
 
 class GAT_old(BaseGAttN):
-    def inference(inputs, nb_classes, nb_nodes, training, attn_drop, ffd_drop,
+    def inference(inputs, nb_classes, nb_nodes, input_dim, training, attn_drop, ffd_drop,
                   bias_mat, hid_units, n_heads, activation=tf.nn.elu, residual=False):
         attns = []
+        # inputs = tf.layers.dense(inputs, input_dim, use_bias=False, kernel_initializer=tf.random_normal_initializer, trainable=True)
         for i in range(n_heads[0]):
             attns.append(layers.attn_head_old(inputs, bias_mat=bias_mat,
                                           out_sz=hid_units[0], activation=activation,

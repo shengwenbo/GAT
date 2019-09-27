@@ -27,6 +27,23 @@ def adj_to_bias(adj, sizes, nhood=1):
                     mt[g][i][j] = 1.0
     return -1e9 * (1.0 - mt)
 
+def adj_to_list(adj, max_nei):
+    nb_nodes = adj.shape[-1]
+    neighbors=[]
+    ids = []
+    adj += np.eye(adj.shape[0], adj.shape[1])
+    for id in range(0, nb_nodes):
+        nei = np.argwhere(adj[id, :])
+        nei = nei.reshape(nei.shape[0])
+        if nei.shape[0] > max_nei:
+            nei = nei[0:max_nei]
+            ids.append(id)
+        else:
+            nei = np.pad(nei, (0, max_nei-nei.shape[0]), mode="constant", constant_values=0)
+        neighbors.append(nei)
+    print(len(ids))
+    print(ids)
+    return np.stack(neighbors)
 
 ###############################################
 # This section of code adapted from tkipf/gcn #

@@ -1,5 +1,0 @@
-Hid units: [8] ; Num heads: [8, 1] 
-Split mode: random_const ; Split parts: [3, 1] 
-In drop: 0.6 ; Coef drop: 0.6 
-Total epochs: 786 
-Test loss: 0.8046883344650269 ; Test accuracy: 0.8159999847412109 
