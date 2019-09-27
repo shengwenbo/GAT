@@ -107,3 +107,5 @@ log/
 log_*/
 out_*/
 
+data/
+citeseer_data/
