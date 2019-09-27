@@ -103,6 +103,7 @@ ENV/
 # idea
 .idea/
 
-./log/
-./log_*
-./out_*
+log/
+log_*/
+out_*/
+
