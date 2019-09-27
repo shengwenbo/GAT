@@ -95,36 +95,39 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, sp_
         seq_fts_sp = []
         seq = tf.expand_dims(seq, 1) # [ns, 1, fd]
         for _ in range(split_parts):
-            sf = tf.layers.conv1d(seq, out_sz, 1, use_bias=False) # [ns, 1, d]
+            sf = tf.layers.dense(seq, out_sz, use_bias=False) # [ns, 1, d]
             sf = tf.nn.embedding_lookup(tf.reshape(sf, [-1, out_sz]), ids)
             seq_fts_sp.append(sf)
-        seq_fts_sp = tf.stack(seq_fts_sp, 0) # [sp, bs, n, d]
-        seq_fts = tf.reduce_mean(seq_fts_sp, 0) # [bs, n, d]
+        seq_fts_sp = tf.stack(seq_fts_sp, 2) # [bs, n, sp, d]
+        seq_fts = tf.reduce_mean(seq_fts_sp, 2) # [bs, n, d]
         cnt_fts = seq_fts[:, 0:1, :] # [bs, 1, d]
 
         # simplest self-attention possible
-        f_1 = tf.layers.conv1d(cnt_fts, 1, 1, use_bias=False) # [bs, 1, 1]
-        f_2 = tf.reshape(seq_fts_sp, [-1, n_nodes, out_sz]) # [sp*bs, n, d]
-        f_2 = tf.layers.conv1d(f_2, 1, 1, use_bias=False) # [sp*bs, n, 1]
-        f_2 = tf.reshape(f_2, [split_parts, -1, n_nodes, 1]) # [sp, bs, n, 1]
-        logits = tf.expand_dims(f_1, 0) + f_2 # [sp, bs, n, 1]
-        in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=0) # [sp, bs, n, 1]
+        f_1 = tf.layers.dense(cnt_fts, 1, use_bias=False) # [bs, 1, 1]
+        f_2 = tf.layers.dense(seq_fts_sp, 1, use_bias=False) # [bs, n, sp, 1]
+        logits = tf.expand_dims(f_1, 1) + tf.transpose(f_2, [0, 1, 3, 2]) # [bs, n, 1, sp]
+        in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=-1) # [bs, n, 1, sp]
 
-        logits = in_coefs * logits # [sp, bs, n, 1]
-        coefs = tf.nn.softmax(tf.nn.leaky_relu(tf.reduce_sum(logits, axis=0)))  # [bs, n, 1]
-        coefs = tf.expand_dims(coefs, 0) # [1, bs, n, 1]
-        coefs = coefs * in_coefs # [sp, bs, n, 1]
+        # if coef_drop != 0.0:
+        #     in_coefs = tf.nn.dropout(in_coefs, 1.0 - coef_drop)
+        # if in_drop != 0.0:
+        #     seq_fts_sp = tf.nn.dropout(seq_fts_sp, 1.0 - in_drop)
+
+        new_seq_fts = tf.matmul(in_coefs, seq_fts_sp) # [bs, n, 1, d]
+        new_seq_fts = tf.reshape(new_seq_fts, [-1, n_nodes, out_sz]) # [bs, n, d]
+        f_1_new = tf.layers.dense(cnt_fts, 1, use_bias=False)  # [bs, 1, 1]
+        f_2_new = tf.layers.dense(new_seq_fts, 1, use_bias=False)  # [bs, n, 1]
+        logits_new = f_1_new + tf.transpose(f_2_new, [0, 2, 1])  # [bs, 1, n]
+        coefs = tf.nn.softmax(tf.nn.leaky_relu(logits_new), axis=-1) # [bs, 1, n]
 
         if coef_drop != 0.0:
             coefs = tf.nn.dropout(coefs, 1.0 - coef_drop)
         if in_drop != 0.0:
-            seq_fts_sp = tf.nn.dropout(seq_fts_sp, 1.0 - in_drop)
+            new_seq_fts = tf.nn.dropout(new_seq_fts, 1.0 - in_drop)
 
-        vals = seq_fts_sp * coefs # [sp, bs, n, d]
-        vals = tf.reduce_sum(vals, 0)  # [bs, n, d]
-        ret = tf.reduce_sum(vals, axis=1)  # [bs, d]
-
-        # ret = tf.contrib.layers.bias_add(vals)
+        vals = tf.matmul(coefs, new_seq_fts) # [bs, 1, d]
+        ret = tf.reshape(vals, [-1, out_sz])
+        # ret = tf.contrib.layers.bias_add(ret)
 
         # residual connection
         if residual:

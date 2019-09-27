@@ -135,7 +135,7 @@ if __name__ == "__main__":
                 tr_size = features.shape[0]
 
                 while tr_step * batch_size < tr_size:
-                    _, loss_value_tr, acc_tr, summary_tr = sess.run([train_op, loss, accuracy, merged],
+                    tr_op_out, loss_value_tr, acc_tr, summary_tr = sess.run([train_op, loss, accuracy, merged],
                         feed_dict={
                             ftr_in: features,
                             ids_in: adj_list[tr_step*batch_size:(tr_step+1)*batch_size],
