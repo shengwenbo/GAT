@@ -102,3 +102,7 @@ ENV/
 
 # idea
 .idea/
+
+./log/
+./log_*
+./out_*
