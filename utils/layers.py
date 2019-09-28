@@ -82,7 +82,12 @@ def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0,
 
         return activation(ret)  # activation
 
-def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
+def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, attn="inner", sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
+    if attn == "inner":
+        attn = attn_inner
+    else:
+        raise Exception
+
     if sparse:
         n_nodes = ids.dense_shape[1]
     else:
@@ -98,31 +103,27 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, sp_
             sf = tf.layers.conv1d(seq, out_sz, 1, use_bias=False) # [ns, 1, d]
             sf = tf.nn.embedding_lookup(tf.reshape(sf, [-1, out_sz]), ids)
             seq_fts_sp.append(sf)
-        seq_fts_sp = tf.stack(seq_fts_sp, 0) # [sp, bs, n, d]
-        seq_fts = tf.reduce_mean(seq_fts_sp, 0) # [bs, n, d]
+        seq_fts_sp = tf.stack(seq_fts_sp, 2) # [bs, n, sp, d]
+        seq_fts = tf.reduce_mean(seq_fts_sp, 2) # [bs, n, d]
         cnt_fts = seq_fts[:, 0:1, :] # [bs, 1, d]
 
         # simplest self-attention possible
-        f_1 = tf.layers.conv1d(cnt_fts, 1, 1, use_bias=False) # [bs, 1, 1]
-        f_2 = tf.reshape(seq_fts_sp, [-1, n_nodes, out_sz]) # [sp*bs, n, d]
-        f_2 = tf.layers.conv1d(f_2, 1, 1, use_bias=False) # [sp*bs, n, 1]
-        f_2 = tf.reshape(f_2, [split_parts, -1, n_nodes, 1]) # [sp, bs, n, 1]
-        logits = tf.expand_dims(f_1, 0) + f_2 # [sp, bs, n, 1]
-        in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=0) # [sp, bs, n, 1]
+        logits = attn(tf.expand_dims(cnt_fts, 1), seq_fts_sp, 4) # [bs, n, 1, sp]
+        in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=-1) # [bs, n, 1, sp]
 
-        logits = in_coefs * logits # [sp, bs, n, 1]
-        coefs = tf.nn.softmax(tf.nn.leaky_relu(tf.reduce_sum(logits, axis=0)))  # [bs, n, 1]
-        coefs = tf.expand_dims(coefs, 0) # [1, bs, n, 1]
-        coefs = coefs * in_coefs # [sp, bs, n, 1]
+        logits = in_coefs * logits # [bs, n, 1, sp]
+        coefs = tf.nn.softmax(tf.nn.leaky_relu(tf.reduce_sum(logits, axis=-1)))  # [bs, n, 1]
+        coefs = tf.expand_dims(coefs, -1) # [bs, n, 1, 1]
+        coefs = coefs * in_coefs # [bs, n, 1, sp]
 
         if coef_drop != 0.0:
             coefs = tf.nn.dropout(coefs, 1.0 - coef_drop)
         if in_drop != 0.0:
             seq_fts_sp = tf.nn.dropout(seq_fts_sp, 1.0 - in_drop)
 
-        vals = seq_fts_sp * coefs # [sp, bs, n, d]
-        vals = tf.reduce_sum(vals, 0)  # [bs, n, d]
-        ret = tf.reduce_sum(vals, axis=1)  # [bs, d]
+        vals = tf.matmul(coefs, seq_fts_sp) # [bs, n, 1, d]
+        ret = tf.reduce_sum(vals, axis=1)  # [bs, 1, d]
+        ret = tf.reshape(ret, [-1, out_sz])
 
         # ret = tf.contrib.layers.bias_add(vals)
 
@@ -257,3 +258,16 @@ def sp_attn_head_old(seq, out_sz, adj_mat, activation, nb_nodes, split_parts=4, 
                 seq_fts = ret + seq
 
         return activation(ret)  # activation
+
+def attn_inner(f1, f2, attn_size):
+
+    f1 = tf.layers.dense(f1, attn_size, use_bias=False)
+    f2 = tf.layers.dense(f2, attn_size, use_bias=False)
+    logits = f1 * f2
+    logits = tf.reduce_sum(logits, -1)
+    logits = tf.expand_dims(logits, -2)
+
+    return logits
+
+def attn_simple(f1, f2, attn_size):
+    return None

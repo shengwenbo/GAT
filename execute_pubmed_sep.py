@@ -14,8 +14,8 @@ dataset = 'pubmed'
 
 # training params
 nb_epochs = 20000
-patience = 20
-lr = 0.005  # learning rate
+patience = 10
+lr = 0.01  # learning rate
 l2_coef = 0.002  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
 # n_heads = [8, 1] # additional entry for the output layer
