@@ -6,7 +6,7 @@ from scipy.sparse.linalg.eigen.arpack import eigsh
 import sys
 import random
 
-random.seed(100)
+random.seed(200)
 
 """
  Prepare adjacency matrix by expanding up to a given neighbourhood.

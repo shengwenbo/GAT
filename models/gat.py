@@ -21,7 +21,7 @@ class GAT(BaseGAttN):
             attns.append(layers.attn_head(inputs, bias_mat=bias_mat,
                 split_mode=split_mode, split_parts=split_parts[0], sp_wei=sp_wei,
                 out_sz=hid_units[0], activation=activation,
-                in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("in",i)))
+                in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("in",i))[0])
         h_1 = tf.concat(attns, axis=-1)
         for i in range(1, len(hid_units)):
             if split_mode == "train_share":
@@ -38,7 +38,7 @@ class GAT(BaseGAttN):
                 attns.append(layers.attn_head(h_1, bias_mat=bias_mat,
                 split_mode=split_mode, split_parts=split_parts[i], sp_wei=sp_wei,
                     out_sz=hid_units[i], activation=activation,
-                    in_drop=ffd_drop, coef_drop=attn_drop, residual=residual, name="attn_{}_{}".format(i,j)))
+                    in_drop=ffd_drop, coef_drop=attn_drop, residual=residual, name="attn_{}_{}".format(i,j))[0])
             h_1 = tf.concat(attns, axis=-1)
         out = []
         if split_mode == "train_share":
@@ -49,14 +49,18 @@ class GAT(BaseGAttN):
             sp_wei = tf.constant(sp_wei, dtype=tf.float32)
         else:
             sp_wei = None
+        attn=[]
         for i in range(n_heads[-1]):
-            out.append(layers.attn_head(h_1, bias_mat=bias_mat,
+            attn.append(layers.attn_head(h_1, bias_mat=bias_mat,
                 split_mode=split_mode, split_parts=split_parts[-1], sp_wei=sp_wei,
                 out_sz=nb_classes, activation=lambda x: x,
                 in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("out", i)))
+        for a in attn:
+            out.append(a[0])
+        key_vecs = attn[0][1]
         logits = tf.add_n(out) / n_heads[-1]
     
-        return logits
+        return logits, key_vecs
 
 
 class GAT_old(BaseGAttN):
@@ -67,7 +71,7 @@ class GAT_old(BaseGAttN):
         for i in range(n_heads[0]):
             attns.append(layers.attn_head_old(inputs, bias_mat=bias_mat,
                                           out_sz=hid_units[0], activation=activation,
-                                          in_drop=ffd_drop, coef_drop=attn_drop, residual=False))
+                                          in_drop=ffd_drop, coef_drop=attn_drop, residual=False)[0])
         h_1 = tf.concat(attns, axis=-1)
         for i in range(1, len(hid_units)):
             h_old = h_1
@@ -75,13 +79,17 @@ class GAT_old(BaseGAttN):
             for j in range(n_heads[i]):
                 attns.append(layers.attn_head_old(h_1, bias_mat=bias_mat,
                                               out_sz=hid_units[i], activation=activation,
-                                              in_drop=ffd_drop, coef_drop=attn_drop, residual=residual))
+                                              in_drop=ffd_drop, coef_drop=attn_drop, residual=residual)[0])
             h_1 = tf.concat(attns, axis=-1)
         out = []
+        attn = []
         for i in range(n_heads[-1]):
-            out.append(layers.attn_head_old(h_1, bias_mat=bias_mat,
+            attn.append(layers.attn_head_old(h_1, bias_mat=bias_mat,
                                         out_sz=nb_classes, activation=lambda x: x,
                                         in_drop=ffd_drop, coef_drop=attn_drop, residual=False))
+        for a in attn:
+            out.append(a[0])
+        key_vecs = attn[0][1]
         logits = tf.add_n(out) / n_heads[-1]
 
-        return logits
+        return logits, key_vecs

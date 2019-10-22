@@ -50,7 +50,7 @@ def attn_head(seq, out_sz, activation, bias_mat=None, split_mode="random_const",
             else:
                 seq_fts = ret + seq
 
-        return activation(ret)  # activation
+        return activation(ret), seq_fts_sp  # activation
 
 def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0, residual=False):
     with tf.name_scope('my_attn'):
@@ -80,7 +80,7 @@ def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0,
             else:
                 seq_fts = ret + seq
 
-        return activation(ret)  # activation
+        return activation(ret), seq_fts  # activation
 
 def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, attn="inner", sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
     if attn == "inner":
@@ -108,7 +108,7 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, att
         cnt_fts = seq_fts[:, 0:1, :] # [bs, 1, d]
 
         # simplest self-attention possible
-        logits = attn(tf.expand_dims(cnt_fts, 1), seq_fts_sp, 4) # [bs, n, 1, sp]
+        logits = attn(tf.expand_dims(cnt_fts, 1), seq_fts_sp, 16, name) # [bs, n, 1, sp]
         in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=-1) # [bs, n, 1, sp]
 
         logits = in_coefs * logits # [bs, n, 1, sp]
@@ -259,10 +259,10 @@ def sp_attn_head_old(seq, out_sz, adj_mat, activation, nb_nodes, split_parts=4, 
 
         return activation(ret)  # activation
 
-def attn_inner(f1, f2, attn_size):
+def attn_inner(f1, f2, attn_size, name):
 
-    f1 = tf.layers.dense(f1, attn_size, use_bias=False)
-    f2 = tf.layers.dense(f2, attn_size, use_bias=False)
+    f1 = tf.layers.dense(f1, attn_size, use_bias=False, name=name+"_attn_inner", reuse=tf.AUTO_REUSE)
+    f2 = tf.layers.dense(f2, attn_size, use_bias=False, name=name+"_attn_inner", reuse=tf.AUTO_REUSE)
     logits = f1 * f2
     logits = tf.reduce_sum(logits, -1)
     logits = tf.expand_dims(logits, -2)

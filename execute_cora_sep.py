@@ -219,14 +219,17 @@ if __name__ == "__main__":
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
 
+            err_total = 0
             y = y_train + y_val + y_test
             lbl_all = np.argmax(y, axis=-1).tolist()
-            with open("{}/{}_{}.txt".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w") as fout:
+            with open("{}/{}_{}.false".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w") as fout:
                 for logs in test_logs:
                     pred = np.argmax(logs, axis=-1).tolist()
 
                     for p, r, i in zip(pred, lbl_all, range(len(pred))):
                         if p != r:
+                            err_total += 1
+                            fout.write("NO: {}\n".format(err_total))
                             fout.write("ID: {}\n".format(i))
                             fout.write("Pred: {}, real: {}.\n".format(p, r))
 
@@ -234,9 +237,64 @@ if __name__ == "__main__":
                             nbs = [adj_list[i, j] for j in range(max_nei) if adj_list[i, j] > 0]
                             ftr_nb = features[nbs, :]
 
+                            nbs2 = []
+                            lbl2 = []
+                            lbl2_p = []
+                            for nb in nbs:
+                                nb2 = [adj_list[nb, j] for j in range(max_nei) if adj_list[nb, j] > 0]
+                                l2 = [lbl_all[nb] for nb in nb2]
+                                l2_p = [pred[nb] for nb in nb2]
+                                nbs2.append(nb2)
+                                lbl2_p.append(l2_p)
+                                lbl2.append(l2)
+
                             fout.write("Neighbors: {}\n".format(nbs))
-                            # print("Feature: {}".format(ftr))
+                            lbl_p = [pred[nb] for nb in nbs]
+                            fout.write("Neighbor labels pred: {}\n".format(lbl_p))
                             fout.write("Neighbor labels: {}\n\n".format([lbl_all[nb] for nb in nbs]))
+
+                            fout.write("2 layer neighbors: {}\n".format(nbs2))
+                            fout.write("2 layer neighbor labels pred: {}\n".format(lbl2_p))
+                            fout.write("2 layer neighbor labels: {}\n\n\n".format(lbl2))
+                            # print("Neighbor Features: {}".format(ftr_nb))
+
+            err_total = 0
+            y = y_train + y_val + y_test
+            lbl_all = np.argmax(y, axis=-1).tolist()
+            with open("{}/{}_{}.true".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w") as fout:
+                for logs in test_logs:
+                    pred = np.argmax(logs, axis=-1).tolist()
+
+                    for p, r, i in zip(pred, lbl_all, range(len(pred))):
+                        if p == r:
+                            err_total += 1
+                            fout.write("NO: {}\n".format(err_total))
+                            fout.write("ID: {}\n".format(i))
+                            fout.write("Pred: {}, real: {}.\n".format(p, r))
+
+                            ftr = features[i, :]
+                            nbs = [adj_list[i, j] for j in range(max_nei) if adj_list[i, j] > 0]
+                            ftr_nb = features[nbs, :]
+
+                            nbs2 = []
+                            lbl2 = []
+                            lbl2_p = []
+                            for nb in nbs:
+                                nb2 = [adj_list[nb, j] for j in range(max_nei) if adj_list[nb, j] > 0]
+                                l2 = [lbl_all[nb] for nb in nb2]
+                                l2_p = [pred[nb] for nb in nb2]
+                                nbs2.append(nb2)
+                                lbl2_p.append(l2_p)
+                                lbl2.append(l2)
+
+                            fout.write("Neighbors: {}\n".format(nbs))
+                            lbl_p = [pred[nb] for nb in nbs]
+                            fout.write("Neighbor labels pred: {}\n".format(lbl_p))
+                            fout.write("Neighbor labels: {}\n\n".format([lbl_all[nb] for nb in nbs]))
+
+                            fout.write("2 layer neighbors: {}\n".format(nbs2))
+                            fout.write("2 layer neighbor labels pred: {}\n".format(lbl2_p))
+                            fout.write("2 layer neighbor labels: {}\n\n\n".format(lbl2))
                             # print("Neighbor Features: {}".format(ftr_nb))
 
             with open("{}/{}_{}.txt".format(out_dir, "_".join(sys.argv[1:7]), ts_acc/ts_step), "w") as fout:
@@ -247,3 +305,4 @@ if __name__ == "__main__":
                 fout.write("{} {} {} {} {}".format('Test loss:', ts_loss/ts_step, '; Test accuracy:', ts_acc/ts_step, "\n"))
 
             sess.close()
+

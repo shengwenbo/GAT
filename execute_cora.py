@@ -4,6 +4,7 @@ import tensorflow as tf
 import sys
 import os
 import shutil
+import pickle as pkl
 
 from models import GAT, GAT_old
 from utils import process
@@ -85,13 +86,13 @@ if __name__ == "__main__":
 
         if split_mode == "origin":
             model = GAT_old
-            logits = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
+            logits, key_vecs = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
                                     attn_drop, ffd_drop,
                                     bias_mat=bias_in,
                                     hid_units=hid_units, n_heads=n_heads,
                                     residual=residual, activation=nonlinearity)
         else:
-            logits = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
+            logits, key_vecs = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
                                     attn_drop, ffd_drop,
                                     split_mode=split_mode, split_parts=split_parts,
                                     bias_mat=bias_in,
@@ -205,7 +206,7 @@ if __name__ == "__main__":
             test_lbls = []
 
             while ts_step * batch_size < ts_size:
-                loss_value_ts, acc_ts, log = sess.run([loss, accuracy, log_resh],
+                loss_value_ts, acc_ts, key_vecs_data, log = sess.run([loss, accuracy, key_vecs, log_resh],
                     feed_dict={
                         ftr_in: features[ts_step*batch_size:(ts_step+1)*batch_size],
                         bias_in: biases[ts_step*batch_size:(ts_step+1)*batch_size],
@@ -219,27 +220,96 @@ if __name__ == "__main__":
                 test_logs.append(log)
                 test_lbls.append(y_test[0])
 
+            pkl.dump(key_vecs_data, open("{}.key_vecs".format(split_mode), "wb"))
 
-            # y = y_train + y_val + y_test
-            # lbl_all = np.argmax(y[0], axis=-1).tolist()
-            # for logs in test_logs:
-            #     pred = np.argmax(logs, axis=-1).tolist()
-            #
-            #     for p, r, i in zip(pred, lbl_all, range(len(pred))):
-            #         if p != r:
-            #             print("ID: {}".format(i))
-            #             print("Pred: {}, real: {}.".format(p, r))
-            #
-            #             ftr = features[0, i, :]
-            #             bias = biases[0, i, :]
-            #             nbs = [j for j in range(len(pred)) if bias[j] > -1]
-            #             ftr_nb = features[0, nbs, :]
-            #
-            #             print("Neighbors: {}".format(nbs))
-            #             # print("Feature: {}".format(ftr))
-            #             print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
-            #             # print("Neighbor Features: {}".format(ftr_nb))
-            #             print()
+            stdout_old = sys.stdout
+            sys.stdout = open("{}/{}_{}.false".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w")
+            y = y_train + y_val + y_test
+            lbl_all = np.argmax(y[0], axis=-1).tolist()
+            err_total = 0
+            for logs in test_logs:
+                pred = np.argmax(logs, axis=-1).tolist()
+                # pred_p = [float(logs[i, p]) for i, p in zip(range(len(pred), pred))]
+
+                for p, r, i in zip(pred, lbl_all, range(len(pred))):
+                    if p != r:
+                        err_total += 1
+                        print("NO. {}".format(err_total))
+                        print("ID: {}".format(i))
+                        print("Pred: {}, real: {}.".format(p, r))
+
+                        ftr = features[0, i, :]
+                        bias = biases[0, i, :]
+                        nbs = [j for j in range(len(pred)) if bias[j] > -1 and j != i]
+                        nbs2 = []
+                        lbl2 = []
+                        lbl2_p = []
+                        for nb in nbs:
+                            bias = biases[0, nb, :]
+                            nb2 = [j for j in range(len(pred)) if bias[j] > -1 and j != nb]
+                            l2 = [lbl_all[nb] for nb in nb2]
+                            l2_p = [pred[nb] for nb in nb2]
+                            nbs2.append(nb2)
+                            lbl2_p.append(l2_p)
+                            lbl2.append(l2)
+                        ftr_nb = features[0, nbs, :]
+
+                        print("Neighbors: {}".format(nbs))
+                        # print("Feature: {}".format(ftr))
+                        lbl_p = [pred[nb] for nb in nbs]
+                        print("Neighbor labels pred: {}".format(lbl_p))
+                        # print("Neighbor labels conf: {}".format([float(logs[n, l]) for n,l in zip(nbs, lbl_p)]))
+                        print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
+                        print("2 layer neighbors: {}".format(nbs2))
+                        print("2 layer neighbor labels pred: {}".format(lbl2_p))
+                        print("2 layer neighbor labels: {}".format(lbl2))
+                        # print("Neighbor Features: {}".format(ftr_nb))
+                        print()
+            sys.stdout = stdout_old
+
+            sys.stdout = open("{}/{}_{}.true".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w")
+            y = y_train + y_val + y_test
+            lbl_all = np.argmax(y[0], axis=-1).tolist()
+            err_total = 0
+            for logs in test_logs:
+                pred = np.argmax(logs, axis=-1).tolist()
+                # pred_p = [float(logs[i, p]) for i, p in zip(range(len(pred), pred))]
+
+                for p, r, i in zip(pred, lbl_all, range(len(pred))):
+                    if p == r:
+                        err_total += 1
+                        print("NO. {}".format(err_total))
+                        print("ID: {}".format(i))
+                        print("Pred: {}, real: {}.".format(p, r))
+
+                        ftr = features[0, i, :]
+                        bias = biases[0, i, :]
+                        nbs = [j for j in range(len(pred)) if bias[j] > -1 and j != i]
+                        nbs2 = []
+                        lbl2 = []
+                        lbl2_p = []
+                        for nb in nbs:
+                            bias = biases[0, nb, :]
+                            nb2 = [j for j in range(len(pred)) if bias[j] > -1 and j != nb]
+                            l2 = [lbl_all[nb] for nb in nb2]
+                            l2_p = [pred[nb] for nb in nb2]
+                            nbs2.append(nb2)
+                            lbl2_p.append(l2_p)
+                            lbl2.append(l2)
+                        ftr_nb = features[0, nbs, :]
+
+                        print("Neighbors: {}".format(nbs))
+                        # print("Feature: {}".format(ftr))
+                        lbl_p = [pred[nb] for nb in nbs]
+                        print("Neighbor labels pred: {}".format(lbl_p))
+                        # print("Neighbor labels conf: {}".format([float(logs[n, l]) for n,l in zip(nbs, lbl_p)]))
+                        print("Neighbor labels: {}".format([lbl_all[nb] for nb in nbs]))
+                        print("2 layer neighbors: {}".format(nbs2))
+                        print("2 layer neighbor labels pred: {}".format(lbl2_p))
+                        print("2 layer neighbor labels: {}".format(lbl2))
+                        # print("Neighbor Features: {}".format(ftr_nb))
+                        print()
+            sys.stdout = stdout_old
 
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
