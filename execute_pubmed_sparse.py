@@ -49,6 +49,7 @@ out_dir = sys.argv[2]
 log_dir = sys.argv[3]
 
 seed = os.path.basename(out_dir)
+seed = int(seed)
 random.seed(seed)
 tf.set_random_seed(seed)
 np.random.seed(seed)

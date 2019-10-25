@@ -42,6 +42,7 @@ if __name__ == "__main__":
     log_dir = sys.argv[8]
 
     seed = os.path.basename(out_dir)
+    seed = int(seed)
     random.seed(seed)
     tf.set_random_seed(seed)
     np.random.seed(seed)
