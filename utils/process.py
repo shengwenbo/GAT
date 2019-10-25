@@ -6,8 +6,6 @@ from scipy.sparse.linalg.eigen.arpack import eigsh
 import sys
 import random
 
-random.seed(200)
-
 """
  Prepare adjacency matrix by expanding up to a given neighbourhood.
  This will insert loops on every node.

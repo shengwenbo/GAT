@@ -5,6 +5,7 @@ import sys
 import os
 import shutil
 import pickle as pkl
+import random
 
 from models import GAT, GAT_old
 from utils import process
@@ -38,6 +39,11 @@ if __name__ == "__main__":
     train_size = int(sys.argv[6])
     out_dir = sys.argv[7]
     log_dir = sys.argv[8]
+
+    seed = os.path.basename(out_dir)
+    random.seed(seed)
+    tf.set_random_seed(seed)
+    np.random.seed(seed)
 
     turn = int(out_dir.strip().split("/")[-1])
     tf.random_normal_initializer.seed = turn

@@ -3,6 +3,7 @@ import scipy.sparse as sp
 import numpy as np
 import tensorflow as tf
 import argparse
+import random
 
 from models import GAT
 from models import SpGAT
@@ -46,6 +47,12 @@ sparse = True
 tr_size = int(sys.argv[1])
 out_dir = sys.argv[2]
 log_dir = sys.argv[3]
+
+seed = os.path.basename(out_dir)
+random.seed(seed)
+tf.set_random_seed(seed)
+np.random.seed(seed)
+
 adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, tr_size)
 features, spars = process.preprocess_features(features)
 
