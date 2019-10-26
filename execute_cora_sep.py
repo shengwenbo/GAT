@@ -5,6 +5,7 @@ import sys
 import os
 import shutil
 import random
+import pickle as pkl
 
 from models import SEP_GAT
 from utils import process
@@ -16,7 +17,7 @@ dataset = 'cora'
 nb_epochs = 20000
 patience = 10
 lr = 0.01  # learning rate
-l2_coef = 0.0005  # weight decay
+l2_coef = 0.005  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
 # n_heads = [8, 1] # additional entry for the output layer
 residual = False
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     print('nonlinearity: ' + str(nonlinearity))
     print('model: ' + str(model))
 
-    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, train_size, class_balanced=True)
+    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask, ally = process.load_data(dataset, train_size, class_balanced=True)
     features, spars = process.preprocess_features(features)
 
     adj = np.array(adj.todense())
@@ -96,7 +97,7 @@ if __name__ == "__main__":
             ffd_drop = tf.placeholder(dtype=tf.float32, shape=())
             is_train = tf.placeholder(dtype=tf.bool, shape=())
 
-            logits = model.inference(ids_in, ftr_in, nb_classes, nb_nodes, is_train,
+            logits, key_vecs, hid_vecs = model.inference(ids_in, ftr_in, nb_classes, nb_nodes, is_train,
                                     attn_drop, ffd_drop,
                                     split_mode=split_mode, split_parts=split_parts,
                                     hid_units=hid_units, n_heads=n_heads,
@@ -209,7 +210,7 @@ if __name__ == "__main__":
             test_lbls = []
 
             while ts_step * batch_size < ts_size:
-                loss_value_ts, acc_ts, log = sess.run([loss, accuracy, log_resh],
+                loss_value_ts, acc_ts, log, key_vecs_data, hid_vecs_data = sess.run([loss, accuracy, log_resh, key_vecs, hid_vecs],
                     feed_dict={
                         ftr_in: features,
                         ids_in: adj_list[ts_step*batch_size:(ts_step+1)*batch_size],
@@ -226,9 +227,12 @@ if __name__ == "__main__":
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
 
+            pkl.dump(key_vecs_data, open("./analyze/train.key_vecs", "wb"))
+            pkl.dump(hid_vecs_data, open("./analyze/train.hid_vecs", "wb"))
+
             err_total = 0
             y = y_train + y_val + y_test
-            lbl_all = np.argmax(y, axis=-1).tolist()
+            lbl_all = [0] + np.argmax(ally, axis=-1).tolist()
             with open("{}/{}_{}.false".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w") as fout:
                 for logs in test_logs:
                     pred = np.argmax(logs, axis=-1).tolist()
@@ -266,8 +270,6 @@ if __name__ == "__main__":
                             # print("Neighbor Features: {}".format(ftr_nb))
 
             err_total = 0
-            y = y_train + y_val + y_test
-            lbl_all = np.argmax(y, axis=-1).tolist()
             with open("{}/{}_{}.true".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w") as fout:
                 for logs in test_logs:
                     pred = np.argmax(logs, axis=-1).tolist()

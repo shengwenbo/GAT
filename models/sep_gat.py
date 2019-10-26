@@ -8,6 +8,7 @@ class SEP_GAT(BaseGAttN):
     def inference(ids, features, nb_classes, nb_nodes, training, attn_drop, ffd_drop,
             hid_units, n_heads, split_mode, split_parts, activation=tf.nn.elu, residual=False, sparse=False):
         attns = []
+        key_vecs = []
         if split_mode == "train_share":
             sp_wei = tf.get_variable("sp_wei_{}".format("in"), [split_parts[0], hid_units[0]])
         elif split_mode == "random_const":
@@ -17,11 +18,13 @@ class SEP_GAT(BaseGAttN):
         else:
             sp_wei = None
         for i in range(n_heads[0]):
-            attns.append(layers.attn_head_sep(features, ids,
+            attn = layers.attn_head_sep(features, ids,
                  split_parts=split_parts[0], sp_wei=sp_wei,
                 out_sz=hid_units[0], activation=activation, sparse=sparse,
-                in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("in",i)))
+                in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("in",i))
+            attns.append(attn[0])
         h_1 = tf.concat(attns, axis=-1)
+
         # h_1 = tf.nn.embedding_lookup(h_1, ids)
         for i in range(1, len(hid_units)):
             if split_mode == "train_share":
@@ -35,10 +38,11 @@ class SEP_GAT(BaseGAttN):
             h_old = h_1
             attns = []
             for j in range(n_heads[i]):
-                attns.append(layers.attn_head_sep(h_1, ids,
+                attn = layers.attn_head_sep(h_1, ids,
                 split_parts=split_parts[i], sp_wei=sp_wei,
                     out_sz=hid_units[i], activation=activation,sparse=sparse,
-                    in_drop=ffd_drop, coef_drop=attn_drop, residual=residual, name="attn_{}_{}".format(i,j)))
+                    in_drop=ffd_drop, coef_drop=attn_drop, residual=residual, name="attn_{}_{}".format(i,j))
+                attns.append(attn[0])
             h_1 = tf.concat(attns, axis=-1)
             # h_1 = tf.nn.embedding_lookup(h_1, ids)
         out = []
@@ -51,13 +55,16 @@ class SEP_GAT(BaseGAttN):
         else:
             sp_wei = None
         for i in range(n_heads[-1]):
-            out.append(layers.attn_head_sep(h_1, ids,
+            attn = layers.attn_head_sep(h_1, ids,
                 split_parts=split_parts[-1], sp_wei=sp_wei,
                 out_sz=nb_classes, activation=lambda x: x,sparse=sparse,
-                in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("out", i)))
+                in_drop=ffd_drop, coef_drop=attn_drop, residual=False, name="attn_{}_{}".format("out", i))
+            key_vecs.append(attn[1])
+            out.append(attn[0])
         logits = tf.add_n(out) / n_heads[-1]
+        key_vecs = tf.concat(key_vecs, axis=-1)
     
-        return logits
+        return logits, key_vecs, logits
 
 
 class GAT_old(BaseGAttN):

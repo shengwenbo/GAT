@@ -67,11 +67,13 @@ class GAT_old(BaseGAttN):
     def inference(inputs, nb_classes, nb_nodes, input_dim, training, attn_drop, ffd_drop,
                   bias_mat, hid_units, n_heads, activation=tf.nn.elu, residual=False):
         attns = []
+        key_vecs = []
         # inputs = tf.layers.dense(inputs, input_dim, use_bias=False, kernel_initializer=tf.random_normal_initializer, trainable=True)
         for i in range(n_heads[0]):
-            attns.append(layers.attn_head_old(inputs, bias_mat=bias_mat,
+            attn = layers.attn_head_old(inputs, bias_mat=bias_mat,
                                           out_sz=hid_units[0], activation=activation,
-                                          in_drop=ffd_drop, coef_drop=attn_drop, residual=False)[0])
+                                          in_drop=ffd_drop, coef_drop=attn_drop, residual=False)
+            attns.append(attn[0])
         h_1 = tf.concat(attns, axis=-1)
         for i in range(1, len(hid_units)):
             h_old = h_1
@@ -81,15 +83,14 @@ class GAT_old(BaseGAttN):
                                               out_sz=hid_units[i], activation=activation,
                                               in_drop=ffd_drop, coef_drop=attn_drop, residual=residual)[0])
             h_1 = tf.concat(attns, axis=-1)
+        key_vecs = h_1
         out = []
         attn = []
         for i in range(n_heads[-1]):
-            attn.append(layers.attn_head_old(h_1, bias_mat=bias_mat,
+            attn = layers.attn_head_old(h_1, bias_mat=bias_mat,
                                         out_sz=nb_classes, activation=lambda x: x,
-                                        in_drop=ffd_drop, coef_drop=attn_drop, residual=False))
-        for a in attn:
-            out.append(a[0])
-        key_vecs = attn[0][1]
+                                        in_drop=ffd_drop, coef_drop=attn_drop, residual=False)
+            out.append(attn[0])
         logits = tf.add_n(out) / n_heads[-1]
 
         return logits, key_vecs

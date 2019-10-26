@@ -19,7 +19,7 @@ nb_epochs = 200
 input_dim = 512
 patience = 10
 lr = 0.01  # learning rate
-l2_coef = 0.0005  # weight decay
+l2_coef = 0.005  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
 # n_heads = [8, 1] # additional entry for the output layer
 residual = False
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     print('nonlinearity: ' + str(nonlinearity))
     print('model: ' + str(model))
 
-    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, train_size, class_balanced=True)
+    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask, ally = process.load_data(dataset, train_size, class_balanced=True)
     features, spars = process.preprocess_features(features)
 
     nb_nodes = features.shape[0]
@@ -227,7 +227,8 @@ if __name__ == "__main__":
                 test_logs.append(log)
                 test_lbls.append(y_test[0])
 
-            pkl.dump(key_vecs_data, open("{}.key_vecs".format(split_mode), "wb"))
+            pkl.dump(key_vecs_data, open("./analyze/{}.key_vecs".format(split_mode), "wb"))
+            pkl.dump(log, open("./analyze/{}.log_vecs".format(split_mode), "wb"))
 
             stdout_old = sys.stdout
             sys.stdout = open("{}/{}_{}.false".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w")

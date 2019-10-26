@@ -133,7 +133,7 @@ def load_data(dataset_str, train_size=None, class_balanced=False): # {'pubmed', 
     print(adj.shape)
     print(features.shape)
 
-    return adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask
+    return adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask, labels
 
 def load_data_sage(prefix):
     return None

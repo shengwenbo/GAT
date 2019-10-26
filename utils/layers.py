@@ -58,6 +58,7 @@ def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0,
             seq = tf.nn.dropout(seq, 1.0 - in_drop)
 
         seq_fts = tf.layers.conv1d(seq, out_sz, 1, use_bias=False)
+        sf_bk = seq_fts
 
         # simplest self-attention possible
         f_1 = tf.layers.conv1d(seq_fts, 1, 1)
@@ -80,11 +81,13 @@ def attn_head_old(seq, out_sz, bias_mat, activation, in_drop=0.0, coef_drop=0.0,
             else:
                 seq_fts = ret + seq
 
-        return activation(ret), seq_fts  # activation
+        return activation(ret), sf_bk  # activation
 
-def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, attn="inner", sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
+def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, attn="simple", sp_wei=None, in_drop=0.0, coef_drop=0.0, residual=False, name="attn"):
     if attn == "inner":
         attn = attn_inner
+    elif attn == "simple":
+        attn = attn_simple
     else:
         raise Exception
 
@@ -104,11 +107,12 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, att
             sf = tf.nn.embedding_lookup(tf.reshape(sf, [-1, out_sz]), ids)
             seq_fts_sp.append(sf)
         seq_fts_sp = tf.stack(seq_fts_sp, 2) # [bs, n, sp, d]
+        sfs_bk = seq_fts_sp
         seq_fts = tf.reduce_mean(seq_fts_sp, 2) # [bs, n, d]
         cnt_fts = seq_fts[:, 0:1, :] # [bs, 1, d]
 
         # simplest self-attention possible
-        logits = attn(tf.expand_dims(cnt_fts, 1), seq_fts_sp, 16, name) # [bs, n, 1, sp]
+        logits = attn(tf.expand_dims(cnt_fts, 1), seq_fts_sp, 4, name) # [bs, n, 1, sp]
         in_coefs = tf.nn.softmax(tf.nn.leaky_relu(logits), axis=-1) # [bs, n, 1, sp]
 
         logits = in_coefs * logits # [bs, n, 1, sp]
@@ -134,7 +138,7 @@ def attn_head_sep(seq, ids, out_sz, activation, sparse=False, split_parts=2, att
             else:
                 seq_fts = ret + seq
 
-        return activation(ret)  # activation
+        return activation(ret), sfs_bk[:,0,:,:]  # activation
 
 def sp_attn_head(seq, out_sz, adj_mat, activation, nb_nodes, split_parts=4, in_drop=0.0, coef_drop=0.0,
                      residual=False):
@@ -269,5 +273,11 @@ def attn_inner(f1, f2, attn_size, name):
 
     return logits
 
-def attn_simple(f1, f2, attn_size):
-    return None
+def attn_simple(f1, f2, attn_size, name):
+
+    f1 = tf.layers.dense(f1, 1, use_bias=False, name=name+"_attn_inner", reuse=tf.AUTO_REUSE)
+    f2 = tf.layers.dense(f2, 1, use_bias=False, name=name+"_attn_inner", reuse=tf.AUTO_REUSE)
+    logits = f1 + f2
+    logits = tf.transpose(logits, [0, 1, 3, 2])
+
+    return logits
