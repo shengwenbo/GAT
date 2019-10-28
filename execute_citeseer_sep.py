@@ -62,7 +62,7 @@ if __name__ == "__main__":
     print('nonlinearity: ' + str(nonlinearity))
     print('model: ' + str(model))
 
-    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, train_size, class_balanced=True)
+    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask, ally = process.load_data(dataset, train_size, class_balanced=True)
     features, spars = process.preprocess_features(features)
 
     adj = np.array(adj.todense())
@@ -96,7 +96,7 @@ if __name__ == "__main__":
             ffd_drop = tf.placeholder(dtype=tf.float32, shape=())
             is_train = tf.placeholder(dtype=tf.bool, shape=())
 
-            logits = model.inference(ids_in, ftr_in, nb_classes, nb_nodes, is_train,
+            logits, key_vecs, hid_vecs = model.inference(ids_in, ftr_in, nb_classes, nb_nodes, is_train,
                                     attn_drop, ffd_drop,
                                     split_mode=split_mode, split_parts=split_parts,
                                     hid_units=hid_units, n_heads=n_heads,

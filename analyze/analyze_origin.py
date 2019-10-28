@@ -32,13 +32,13 @@ dataset = "cora"
 train_size = 140
 n_classes = 7
 # key_vecs_path = "./analyze/train.key_vecs"
-key_vecs_path = "./analyze/train.hid_vecs"
-# key_vecs_path = "./analyze/origin.key_vecs"
+# key_vecs_path = "./analyze/train.hid_vecs"
+key_vecs_path = "./analyze/origin.key_vecs"
 # key_vecs_path = "./analyze/origin.log_vecs"
 
 n_components = 2
 
-center = 1895
+center = 1851
 distant = 2
 
 with open("data/ind.{}.{}".format(dataset, "graph"), 'rb') as f:
@@ -97,7 +97,7 @@ for split in range(n_splits):
     t1 = time()
     print("circles in %.2g sec" % (t1 - t0))
 
-    plt.title("Split %d" % split)
+    plt.title("%s/Split %d" % (key_vecs_path, split))
 
     for src, tgt in zip(srcs, tgts):
         if src not in ids or tgt not in ids:

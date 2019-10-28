@@ -19,9 +19,9 @@ dataset = 'pubmed'
 # training params
 batch_size = 1
 nb_epochs = 100000
-patience = 20
-lr = 0.005  # learning rate
-l2_coef = 0.001  # weight decay
+patience = 10
+lr = 0.01  # learning rate
+l2_coef = 0.002  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
 n_heads = [8, 8] # additional entry for the output layer
 residual = False
@@ -54,7 +54,7 @@ random.seed(seed)
 tf.set_random_seed(seed)
 np.random.seed(seed)
 
-adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, tr_size)
+adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask, ally = process.load_data(dataset, tr_size)
 features, spars = process.preprocess_features(features)
 
 nb_nodes = features.shape[0]

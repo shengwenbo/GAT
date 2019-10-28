@@ -19,7 +19,7 @@ nb_epochs = 200
 input_dim = 512
 patience = 10
 lr = 0.01  # learning rate
-l2_coef = 0.005  # weight decay
+l2_coef = 0.0005  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
 # n_heads = [8, 1] # additional entry for the output layer
 residual = False
@@ -227,13 +227,16 @@ if __name__ == "__main__":
                 test_logs.append(log)
                 test_lbls.append(y_test[0])
 
-            pkl.dump(key_vecs_data, open("./analyze/{}.key_vecs".format(split_mode), "wb"))
-            pkl.dump(log, open("./analyze/{}.log_vecs".format(split_mode), "wb"))
+            if not os.path.exists(out_dir):
+                os.mkdir(out_dir)
+
+            # pkl.dump(key_vecs_data, open("./analyze/{}.key_vecs".format(split_mode), "wb"))
+            # pkl.dump(log, open("./analyze/{}.log_vecs".format(split_mode), "wb"))
 
             stdout_old = sys.stdout
             sys.stdout = open("{}/{}_{}.false".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w")
             y = y_train + y_val + y_test
-            lbl_all = np.argmax(y[0], axis=-1).tolist()
+            lbl_all = np.argmax(ally, axis=-1).tolist()
             err_total = 0
             for logs in test_logs:
                 pred = np.argmax(logs, axis=-1).tolist()
@@ -276,8 +279,6 @@ if __name__ == "__main__":
             sys.stdout = stdout_old
 
             sys.stdout = open("{}/{}_{}.true".format(out_dir, "_".join(sys.argv[1:7]), "test_out"), "w")
-            y = y_train + y_val + y_test
-            lbl_all = np.argmax(y[0], axis=-1).tolist()
             err_total = 0
             for logs in test_logs:
                 pred = np.argmax(logs, axis=-1).tolist()

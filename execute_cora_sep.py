@@ -17,7 +17,7 @@ dataset = 'cora'
 nb_epochs = 20000
 patience = 10
 lr = 0.01  # learning rate
-l2_coef = 0.005  # weight decay
+l2_coef = 0.0005  # weight decay
 hid_units = [8] # numbers of hidden units per each attention head in each layer
 # n_heads = [8, 1] # additional entry for the output layer
 residual = False
@@ -227,8 +227,8 @@ if __name__ == "__main__":
             if not os.path.exists(out_dir):
                 os.mkdir(out_dir)
 
-            pkl.dump(key_vecs_data, open("./analyze/train.key_vecs", "wb"))
-            pkl.dump(hid_vecs_data, open("./analyze/train.hid_vecs", "wb"))
+            # pkl.dump(key_vecs_data, open("./analyze/train.key_vecs", "wb"))
+            # pkl.dump(hid_vecs_data, open("./analyze/train.hid_vecs", "wb"))
 
             err_total = 0
             y = y_train + y_val + y_test

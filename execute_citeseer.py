@@ -60,7 +60,7 @@ if __name__ == "__main__":
     print('nonlinearity: ' + str(nonlinearity))
     print('model: ' + str(model))
 
-    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask = process.load_data(dataset, train_size, class_balanced=True)
+    adj, features, y_train, y_val, y_test, train_mask, val_mask, test_mask, ally = process.load_data(dataset, train_size, class_balanced=True)
     features, spars = process.preprocess_features(features)
 
     nb_nodes = features.shape[0]
@@ -92,13 +92,13 @@ if __name__ == "__main__":
 
         if split_mode == "origin":
             model = GAT_old
-            logits = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
+            logits, key_vecs = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
                                     attn_drop, ffd_drop,
                                     bias_mat=bias_in,
                                     hid_units=hid_units, n_heads=n_heads,
                                     residual=residual, activation=nonlinearity)
         else:
-            logits = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
+            logits, key_vecs = model.inference(ftr_in, nb_classes, nb_nodes, input_dim, is_train,
                                     attn_drop, ffd_drop,
                                     split_mode=split_mode, split_parts=split_parts,
                                     bias_mat=bias_in,
